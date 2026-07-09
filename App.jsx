@@ -529,9 +529,17 @@ function PhoneBtn(props) {
 function WazeBtn(props) {
   return (
     <a href={props.href} target="_blank" rel="noopener noreferrer"
-      style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:36,height:36,borderRadius:8,background:"#05c8f0",textDecoration:"none",flexShrink:0}}>
-      <svg width="22" height="22" viewBox="0 0 48 48" fill="white">
-        <path d="M24 4C13 4 4 13 4 24c0 4.8 1.7 9.2 4.5 12.7L7 42l5.5-1.4C15.5 42.7 19.6 44 24 44c11 0 20-9 20-20S35 4 24 4zm0 36c-3.7 0-7.2-1.1-10.1-3l-.7-.4-4.4 1.1 1.2-4.2-.5-.7C7.9 30.1 7 27.1 7 24 7 14.6 14.6 7 24 7s17 7.6 17 17-7.6 16-17 16zm-2-22a2 2 0 100-4 2 2 0 000 4zm8 0a2 2 0 100-4 2 2 0 000 4zm-4 12c-4 0-7.4-2.6-8.6-6.2l2.8-.9c.8 2.5 3.1 4.1 5.8 4.1s5-1.6 5.8-4.1l2.8.9C33.4 27.4 30 30 26 30z"/>
+      style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:36,height:36,borderRadius:8,background:"#ffffff",border:"1.5px solid #e2e8f0",textDecoration:"none",flexShrink:0}}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28">
+        <ellipse cx="32" cy="38" rx="26" ry="20" fill="#00BFFF"/>
+        <ellipse cx="32" cy="36" rx="24" ry="18" fill="#33CCFF"/>
+        <circle cx="22" cy="32" r="5" fill="white"/>
+        <circle cx="42" cy="32" r="5" fill="white"/>
+        <circle cx="22" cy="32" r="3" fill="#1a1a2e"/>
+        <circle cx="42" cy="32" r="3" fill="#1a1a2e"/>
+        <path d="M24 42 Q32 48 40 42" stroke="#1a1a2e" strokeWidth="2" fill="none" strokeLinecap="round"/>
+        <ellipse cx="32" cy="20" rx="6" ry="8" fill="#33CCFF"/>
+        <ellipse cx="32" cy="14" rx="4" ry="4" fill="#00BFFF"/>
       </svg>
     </a>
   );
@@ -1170,13 +1178,13 @@ function SignatureModal(props) {
 }
 
 var DEFECT_TYPES = {
-  panel:        { label:"דופן",        fields:["height","width","material"] },
-  door_front:   { label:"חזית דלת",    fields:["height","width","hinges","material"] },
-  drawer_front: { label:"חזית מגירה",  fields:["height","width","hinges","material"] },
-  drawer:       { label:"מגירה",       fields:["height","width","depth","material"] },
-  closure:      { label:"סגירה",       fields:["height","width","depth","material"] },
-  cabinet:      { label:"ארון",        fields:["height","width","depth","material"] },
-  shelf:        { label:"מדף",         fields:["height","width","material"] },
+  panel:        { label:"דופן",        fields:["bondergel","material"] },
+  door_front:   { label:"חזית דלת",    fields:["hinges","material"] },
+  drawer_front: { label:"חזית מגירה",  fields:["material"] },
+  drawer:       { label:"מגירה",       fields:["drawerSpecial"] },
+  closure:      { label:"סגירה",       fields:["height","width","material"] },
+  cabinet:      { label:"ארון",        fields:["cabinetSpecial"] },
+  shelf:        { label:"מדף",         fields:["shelfSpecial"] },
   hardware:     { label:"פרזול",       fields:["freeDesc","qty"] },
   socle:        { label:"צוקל",        fields:["height","width","material"] },
   other:        { label:"אחר",         fields:["freeDesc","qty"] }
@@ -1399,7 +1407,7 @@ function DefectItemForm(props) {
   }
 
   var hingesList = item.hingesList || [];
-  var hasSketch = (item.defectType==="panel"||item.defectType==="door_front"||item.defectType==="drawer_front"||item.defectType==="closure"||item.defectType==="socle"||item.defectType==="shelf"||item.defectType==="drawer"||item.defectType==="cabinet");
+  var hasSketch = (item.defectType==="panel"||item.defectType==="door_front"||item.defectType==="drawer_front"||item.defectType==="closure"||item.defectType==="socle");
   function addHinge() {
     set("hingesList", hingesList.concat([{ id:makeId("HNG"), position:"top", measurement:"" }]));
   }
@@ -1425,18 +1433,146 @@ function DefectItemForm(props) {
         <button onClick={props.onRemove} style={{marginRight:8,background:"#fef2f2",border:"none",color:"#ef4444",cursor:"pointer",fontSize:14,padding:"8px 10px",borderRadius:8,fontWeight:700}}>הסר</button>
       </div>
 
-      {(item.defectType==="panel"||item.defectType==="door_front"||item.defectType==="drawer_front"||item.defectType==="closure"||item.defectType==="socle"||item.defectType==="shelf"||item.defectType==="drawer"||item.defectType==="cabinet") ?
+      {hasSketch ?
         <ItemSketch
           item={item}
           set={set}
-          showDepth={item.defectType==="drawer"||item.defectType==="cabinet"||item.defectType==="closure"}
-          hasHinges={item.defectType==="door_front"||item.defectType==="drawer_front"}
+          showDepth={item.defectType==="closure"}
+          hasHinges={item.defectType==="door_front"}
         />
+      : null}
+
+      {/* מגירה - טופס מיוחד */}
+      {item.defectType === "drawer" ?
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>גובה מגירה</div>
+              {["גבוהה","נמוכה","עץ"].map(function(v){ return <button key={v} onClick={function(){set("drawerHeight",v);}} style={{display:"block",width:"100%",marginBottom:4,padding:"7px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.drawerHeight===v?"2px solid #4338ca":"2px solid #e2e8f0",background:item.drawerHeight===v?"#eef2ff":"#f8fafc",color:item.drawerHeight===v?"#4338ca":"#64748b"}}>{v}</button>; })}
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>צבע מגירה</div>
+              {["לבן","גרפיט","סנדוויץ'"].map(function(v){ return <button key={v} onClick={function(){set("drawerColor",v);}} style={{display:"block",width:"100%",marginBottom:4,padding:"7px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.drawerColor===v?"2px solid #4338ca":"2px solid #e2e8f0",background:item.drawerColor===v?"#eef2ff":"#f8fafc",color:item.drawerColor===v?"#4338ca":"#64748b"}}>{v}</button>; })}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>חזית</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {["פנימית פח","פנימית זכוכית","חיצונית","עץ"].map(function(v){ return <button key={v} onClick={function(){set("drawerFront",v);}} style={{padding:"6px 12px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.drawerFront===v?"2px solid #4338ca":"2px solid #e2e8f0",background:item.drawerFront===v?"#eef2ff":"#f8fafc",color:item.drawerFront===v?"#4338ca":"#64748b"}}>{v}</button>; })}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>סוג מגירה</div>
+            <input value={item.drawerType||""} onChange={function(e){set("drawerType",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px 10px",fontSize:13})} placeholder="פרט סוג..." />
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>דפנות</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {["זכוכית","פח","גלריה"].map(function(v){ return <button key={v} onClick={function(){set("drawerSides",v);}} style={{padding:"6px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.drawerSides===v?"2px solid #4338ca":"2px solid #e2e8f0",background:item.drawerSides===v?"#eef2ff":"#f8fafc",color:item.drawerSides===v?"#4338ca":"#64748b"}}>{v}</button>; })}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>עומק מגירה</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {["25","27","30","35","40","45","50","55","60","70"].map(function(v){ return <button key={v} onClick={function(){set("drawerDepth",v);}} style={{padding:"6px 10px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.drawerDepth===v?"2px solid #4338ca":"2px solid #e2e8f0",background:item.drawerDepth===v?"#eef2ff":"#f8fafc",color:item.drawerDepth===v?"#4338ca":"#64748b"}}>{v}</button>; })}
+            </div>
+            {item.drawerDepth ? <div style={{marginTop:4,fontSize:12,color:"#4338ca",fontWeight:700}}>{"נבחר: " + item.drawerDepth + " ס\"מ"}</div> : null}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>רוחב מגירה</div>
+              <input type="number" value={item.drawerWidth||""} onChange={function(e){set("drawerWidth",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>גובה גב</div>
+              <input type="number" value={item.drawerBackH||""} onChange={function(e){set("drawerBackH",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>רוחב חיצוני ארון</div>
+              <input type="number" value={item.drawerCabinetW||""} onChange={function(e){set("drawerCabinetW",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+          </div>
+        </div>
+      : null}
+
+      {/* ארון - טופס מיוחד */}
+      {item.defectType === "cabinet" ?
+        <div style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:8}}>
+            <svg width="200" height="200" style={{overflow:"visible"}}>
+              <rect x="40" y="20" width="120" height="150" fill="#f8fafc" stroke="#334155" strokeWidth={2} rx={4} />
+              <line x1="160" y1="20" x2="185" y2="0" stroke="#94a3b8" strokeWidth={1.5} />
+              <line x1="40" y1="20" x2="65" y2="0" stroke="#94a3b8" strokeWidth={1.5} />
+              <line x1="65" y1="0" x2="185" y2="0" stroke="#94a3b8" strokeWidth={1.5} />
+              {item.cabinetDepth ? <text x="125" y="12" textAnchor="middle" fontSize={11} fill="#6366f1" fontWeight="700">{item.cabinetDepth + " ס\"מ"}</text> : <text x="125" y="12" textAnchor="middle" fontSize={10} fill="#94a3b8">עומק</text>}
+              {item.cabinetH ? <text x="175" y="100" textAnchor="start" fontSize={11} fill="#059669" fontWeight="700">{item.cabinetH}</text> : null}
+              {item.cabinetW ? <text x="100" y="185" textAnchor="middle" fontSize={11} fill="#4338ca" fontWeight="700">{item.cabinetW}</text> : null}
+            </svg>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div>
+              <div style={{fontSize:10,color:"#059669",fontWeight:700,marginBottom:3}}>גובה</div>
+              <input type="number" value={item.cabinetH||""} onChange={function(e){set("cabinetH",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"#4338ca",fontWeight:700,marginBottom:3}}>רוחב</div>
+              <input type="number" value={item.cabinetW||""} onChange={function(e){set("cabinetW",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"#6366f1",fontWeight:700,marginBottom:3}}>עומק</div>
+              <input type="number" value={item.cabinetDepth||""} onChange={function(e){set("cabinetDepth",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>גובה רגל</div>
+              <input type="number" value={item.cabinetLeg||""} onChange={function(e){set("cabinetLeg",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+          </div>
+        </div>
+      : null}
+
+      {/* מדף - טופס מיוחד */}
+      {item.defectType === "shelf" ?
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:10,color:"#4338ca",fontWeight:700,marginBottom:3}}>רוחב</div>
+              <input type="number" value={item.shelfW||""} onChange={function(e){set("shelfW",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div style={{paddingTop:16}}>
+              <button onClick={function(){set("shelfKantW",!item.shelfKantW);}} style={{padding:"7px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.shelfKantW?"2px solid #4338ca":"2px solid #e2e8f0",background:item.shelfKantW?"#eef2ff":"#fff",color:item.shelfKantW?"#4338ca":"#64748b",whiteSpace:"nowrap"}}>
+                {item.shelfKantW ? "✓ קנט" : "בלי קנט"}
+              </button>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:10,color:"#6366f1",fontWeight:700,marginBottom:3}}>עומק</div>
+              <input type="number" value={item.shelfDepth||""} onChange={function(e){set("shelfDepth",e.target.value);}} style={Object.assign({},inpStyle,{padding:"7px",textAlign:"center"})} placeholder="ס״מ" />
+            </div>
+            <div style={{paddingTop:16}}>
+              <button onClick={function(){set("shelfKantD",!item.shelfKantD);}} style={{padding:"7px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.shelfKantD?"2px solid #6366f1":"2px solid #e2e8f0",background:item.shelfKantD?"#eef2ff":"#fff",color:item.shelfKantD?"#6366f1":"#64748b",whiteSpace:"nowrap"}}>
+                {item.shelfKantD ? "✓ קנט" : "בלי קנט"}
+              </button>
+            </div>
+          </div>
+        </div>
+      : null}
+
+      {/* בונדרגל לדופן */}
+      {item.defectType === "panel" ?
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0",marginBottom:8}}>
+          <span style={{fontSize:13,fontWeight:700,color:"#475569"}}>בונדרגל</span>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={function(){set("bondergel","עם");}} style={{padding:"6px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.bondergel==="עם"?"2px solid #4338ca":"2px solid #e2e8f0",background:item.bondergel==="עם"?"#eef2ff":"#fff",color:item.bondergel==="עם"?"#4338ca":"#64748b"}}>עם</button>
+            <button onClick={function(){set("bondergel","בלי");}} style={{padding:"6px 14px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:item.bondergel==="בלי"?"2px solid #94a3b8":"2px solid #e2e8f0",background:item.bondergel==="בלי"?"#f1f5f9":"#fff",color:item.bondergel==="בלי"?"#475569":"#64748b"}}>בלי</button>
+          </div>
+        </div>
       : null}
 
       <div style={{display:"grid",gridTemplateColumns: typeConfig.fields.length>2 ? "1fr 1fr" : "1fr",gap:8,marginBottom:10}}>
         {typeConfig.fields.filter(function(f){
           if (hasSketch && (f==="height"||f==="width"||f==="depth")) return false;
+          if (f==="bondergel"||f==="drawerSpecial"||f==="cabinetSpecial"||f==="shelfSpecial") return false;
           return true;
         }).map(function(f){
           if (f === "freeDesc") {
