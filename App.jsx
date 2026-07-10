@@ -4097,7 +4097,7 @@ export default function App() {
                   <div style={{fontSize:10,color:"#c7d2fe"}}>{currentRole.label}</div>
                 </div>
               </div>
-              {tab === "orders" || tab === "calendar" || tab === "po" || tab === "quotes" || tab === "customers" || tab === "designers" ?
+              {(tab === "orders" || tab === "calendar" || tab === "po" || tab === "quotes" || tab === "customers" || tab === "designers") && currentUser.role !== "installer" && currentUser.role !== "viewer" ?
                 <button onClick={function(){if(tab==="orders")setShowNew(true);else if(tab==="calendar")setNewEventDate(toISO(new Date()));else if(tab==="po")setShowNewPO(true);else if(tab==="quotes")setShowNewQuote(true);else if(tab==="designers")setTab("designers");else setShowNewCustomer(true);}} style={{background:"#fff",color:"#4338ca",border:"none",borderRadius:12,padding:"11px 22px",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 16px rgba(0,0,0,0.2)"}}>
                   {tab === "orders" ? "+ הזמנה חדשה" : tab === "calendar" ? "+ אירוע ביומן" : tab === "po" ? "+ הזמנת טובין" : tab === "quotes" ? "+ הצעת מחיר" : tab === "designers" ? "+ מעצב/ת" : "+ לקוח חדש"}
                 </button>
