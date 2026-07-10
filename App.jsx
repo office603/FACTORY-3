@@ -551,6 +551,24 @@ function WazeBtn(props) {
   );
 }
 
+function PDFViewer(props) {
+  if (!props.src) return null;
+  return (
+    <div onClick={props.onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:10001,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"0"}}>
+      <div style={{width:"100%",background:"#1e1b4b",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+        <span style={{color:"#fff",fontWeight:700,fontSize:14}}>{"📄 " + (props.name||"קובץ")}</span>
+        <div style={{display:"flex",gap:8}}>
+          <a href={props.src} download={props.name} onClick={function(e){e.stopPropagation();}} style={{padding:"6px 14px",background:"rgba(255,255,255,0.15)",color:"#fff",borderRadius:8,fontSize:13,fontWeight:700,textDecoration:"none"}}>הורד</a>
+          <button onClick={props.onClose} style={{background:"rgba(255,255,255,0.15)",color:"#fff",border:"none",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:700,fontSize:13}}>סגור</button>
+        </div>
+      </div>
+      <div onClick={function(e){e.stopPropagation();}} style={{flex:1,width:"100%",overflow:"hidden"}}>
+        <iframe src={props.src} style={{width:"100%",height:"100%",border:"none"}} title={props.name} />
+      </div>
+    </div>
+  );
+}
+
 function ImageLightbox(props) {
   if (!props.src) return null;
   return (
@@ -2298,6 +2316,7 @@ function OrderDetail(props) {
   var idx = STATUSES.findIndex(function(x){ return x.id===order.status; });
   var pct = Math.round((idx+1)/STATUSES.length*100);
   var [confirmDelete, setConfirmDelete] = useState(false);
+  var [viewingFile, setViewingFile] = useState(null);
   var canAddReport = props.canAddReport;
   var installReports = order.installationReports || [];
   return (
@@ -2395,7 +2414,7 @@ function OrderDetail(props) {
                 <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#eff6ff",borderRadius:8,marginBottom:4}}>
                   <span style={{fontSize:13,color:"#1d4ed8"}}>{"📎 " + name}</span>
                   {data ?
-                    <a href={data} download={name} style={{padding:"4px 10px",background:"#1d4ed8",color:"#fff",borderRadius:6,fontSize:12,fontWeight:700,textDecoration:"none"}}>פתח</a>
+                    <button onClick={function(){setViewingFile({src:data,name:name});}} style={{padding:"4px 10px",background:"#1d4ed8",color:"#fff",borderRadius:6,fontSize:12,fontWeight:700,border:"none",cursor:"pointer"}}>פתח</button>
                   : null}
                 </div>
               );
@@ -2489,6 +2508,7 @@ function OrderDetail(props) {
           </div>
         </Modal>
       : null}
+      {viewingFile ? <PDFViewer src={viewingFile.src} name={viewingFile.name} onClose={function(){setViewingFile(null);}} /> : null}
     </Modal>
   );
 }
