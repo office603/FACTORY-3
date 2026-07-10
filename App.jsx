@@ -810,6 +810,152 @@ function DesignersView(props) {
   );
 }
 
+function Dashboard(props) {
+  var orders = props.orders || [];
+  var events = props.events || [];
+  var purchaseOrders = props.purchaseOrders || [];
+  var todayStr = toISO(new Date());
+  var HE_DAYS = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+  var HE_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+  var today = new Date();
+
+  // הזמנות דחופות
+  var urgentOrders = orders.filter(function(o){ return o.urgent && o.status !== "completed"; });
+
+  // תקועות > 7 ימים
+  var stuckOrders = orders.filter(function(o){
+    if (o.status === "completed" || o.urgent) return false;
+    if (!o.statusUpdatedAt) return false;
+    return Math.floor((new Date() - new Date(o.statusUpdatedAt)) / (1000*60*60*24)) >= 7;
+  });
+
+  // אירועים היום
+  var todayEvents = events.filter(function(e){ return e.date === todayStr; })
+    .sort(function(a,b){ return a.time > b.time ? 1 : -1; });
+
+  // חומרים שלא הגיעו, מסודר לפי הזמנה
+  var pendingPOs = purchaseOrders.filter(function(po){
+    var items = po.items || [];
+    return items.some(function(it){ return !it.received; });
+  });
+
+  return (
+    <div style={{maxWidth:1100,margin:"0 auto",padding:"20px 16px",direction:"rtl"}}>
+      <div style={{marginBottom:20}}>
+        <h2 style={{margin:"0 0 2px",fontSize:22,fontWeight:900,color:"#0f172a"}}>שלום 👋</h2>
+        <div style={{fontSize:13,color:"#64748b"}}>{HE_DAYS[today.getDay()] + ", " + today.getDate() + " " + HE_MONTHS[today.getMonth()] + " " + today.getFullYear()}</div>
+      </div>
+
+      {/* סטטיסטיקות מהירות */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+        {[
+          {label:"פתוחות",val:orders.filter(function(o){return o.status!=="completed";}).length,color:"#4338ca",bg:"#eef2ff"},
+          {label:"דחופות",val:urgentOrders.length,color:"#ef4444",bg:"#fef2f2"},
+          {label:"תקועות",val:stuckOrders.length,color:"#f97316",bg:"#fff7ed"},
+        ].map(function(s){
+          return (
+            <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"14px 12px",textAlign:"center"}}>
+              <div style={{fontSize:28,fontWeight:900,color:s.color}}>{s.val}</div>
+              <div style={{fontSize:12,fontWeight:700,color:s.color,opacity:0.8}}>{s.label}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* אירועים היום */}
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",marginBottom:16,overflow:"hidden"}}>
+        <div style={{padding:"14px 16px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>📅 היום ביומן</span>
+          <span style={{fontSize:12,color:"#94a3b8"}}>{todayStr}</span>
+        </div>
+        {todayEvents.length === 0 ?
+          <div style={{padding:"20px",textAlign:"center",color:"#94a3b8",fontSize:13}}>אין אירועים היום</div>
+        :
+          <div style={{padding:"10px 14px"}}>
+            {todayEvents.map(function(ev){
+              var t = getEvType(ev.type);
+              var ord = (props.orders||[]).find(function(o){return o.id===ev.orderId;});
+              return (
+                <div key={ev.id} onClick={function(){props.onGoToCalendar();}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderBottom:"1px solid #f8fafc",cursor:"pointer"}}
+                  onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
+                  onMouseLeave={function(e){e.currentTarget.style.background="transparent";}}>
+                  <div style={{width:36,height:36,borderRadius:"50%",background:t.color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{t.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{t.label}</div>
+                    {ord ? <div style={{fontSize:12,color:"#64748b"}}>{ord.client}</div> : null}
+                    {ev.team ? <div style={{fontSize:11,color:"#94a3b8"}}>{"👷 " + ev.team}</div> : null}
+                  </div>
+                  {ev.time ? <span style={{fontSize:12,fontWeight:700,color:"#4338ca"}}>{ev.time}</span> : null}
+                </div>
+              );
+            })}
+          </div>
+        }
+      </div>
+
+      {/* הזמנות דחופות */}
+      {urgentOrders.length > 0 ?
+        <div style={{background:"#fff",borderRadius:14,border:"2px solid #fecaca",marginBottom:16,overflow:"hidden"}}>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid #fecaca",background:"#fef2f2"}}>
+            <span style={{fontWeight:800,fontSize:15,color:"#ef4444"}}>🔴 הזמנות דחופות</span>
+          </div>
+          <div style={{padding:"10px 14px"}}>
+            {urgentOrders.map(function(o){
+              var s = getStatus(o.status);
+              return (
+                <div key={o.id} onClick={function(){props.onOrderClick(o);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 8px",borderBottom:"1px solid #f8fafc",cursor:"pointer"}}
+                  onMouseEnter={function(e){e.currentTarget.style.background="#fef2f2";}}
+                  onMouseLeave={function(e){e.currentTarget.style.background="transparent";}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{o.client}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>{o.id}</div>
+                  </div>
+                  <span style={{background:s.bg,color:s.color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{s.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      : null}
+
+      {/* חומרים ממתינים לפי הזמנה */}
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+        <div style={{padding:"14px 16px",borderBottom:"1px solid #f1f5f9"}}>
+          <span style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>📦 חומרים שטרם הגיעו</span>
+        </div>
+        {pendingPOs.length === 0 ?
+          <div style={{padding:"20px",textAlign:"center",color:"#94a3b8",fontSize:13}}>כל החומרים התקבלו ✓</div>
+        :
+          <div style={{padding:"10px 14px"}}>
+            {pendingPOs.map(function(po){
+              var pendingItems = (po.items||[]).filter(function(it){return !it.received;});
+              var linkedOrder = (props.orders||[]).find(function(o){return o.id===po.linkedOrderId;});
+              return (
+                <div key={po.id} onClick={function(){props.onPOClick(po);}} style={{padding:"10px 8px",borderBottom:"1px solid #f8fafc",cursor:"pointer"}}
+                  onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
+                  onMouseLeave={function(e){e.currentTarget.style.background="transparent";}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <div>
+                      <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{po.supplier}</span>
+                      {linkedOrder ? <span style={{fontSize:11,color:"#6366f1",marginRight:8}}>{"← " + linkedOrder.client}</span> : null}
+                    </div>
+                    <span style={{background:"#fff7ed",color:"#c2410c",borderRadius:20,padding:"2px 8px",fontSize:11,fontWeight:700}}>{pendingItems.length + " חסרים"}</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {pendingItems.map(function(it,i){
+                      return <span key={i} style={{fontSize:11,background:"#f1f5f9",color:"#475569",borderRadius:6,padding:"2px 8px"}}>{"x"+it.qty+" "+it.name}</span>;
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        }
+      </div>
+    </div>
+  );
+}
+
 function InstallerWorkloadView(props) {
   var users = props.users || [];
   var orders = props.orders || [];
@@ -3887,11 +4033,7 @@ export default function App() {
   var [factoryName, setFactoryName] = useLocalStorage("fac_name", "מפעל הנגרות");
   var [editingName, setEditingName] = useState(false);
   var [nameInput, setNameInput] = useState("");
-  var [tab, setTab] = useState(function(){
-    var role = currentUser ? currentUser.role : "viewer";
-    if (role === "installer") return "calendar";
-    return "orders";
-  });
+  var [tab, setTab] = useState("home");
   var [orders, setOrders] = useLocalStorage("fac_orders", INIT_ORDERS);
   var [events, setEvents] = useLocalStorage("fac_events", INIT_EVENTS);
   var [users, setUsers] = useLocalStorage("fac_users", INIT_USERS);
@@ -4117,18 +4259,19 @@ export default function App() {
 
   // Tabs visible per role
   var TAB_PERMISSIONS = {
-    admin:      ["orders","calendar","catalog","po","quotes","customers","designers","installers","reports","admin"],
+    admin:      ["home","orders","calendar","catalog","po","quotes","customers","designers","installers","reports","admin"],
     purchasing: ["orders","calendar","catalog","po","quotes","customers","designers","installers"],
     installer:  ["calendar","installers"],
     office:     ["orders","calendar","quotes","customers","designers"],
     designer:   ["orders","calendar","quotes","customers","designers"],
-    viewer:     ["orders","calendar","installers"],
+    viewer:     ["home","orders","calendar","installers"],
   };
 
   var currentRoleKey = currentUser ? currentUser.role : "viewer";
   var allowedTabs = TAB_PERMISSIONS[currentRoleKey] || TAB_PERMISSIONS.viewer;
 
   var TABS = [
+    {id:"home",       label:"🏠 בית"},
     {id:"orders",     label:"הזמנות"},
     {id:"calendar",   label:"יומן"},
     {id:"catalog",    label:"מאגר חומרים"},
@@ -4366,6 +4509,17 @@ export default function App() {
 
       {tab === "designers" ?
         <DesignersView designers={designers} customers={customers} onSave={saveDesigner} onDelete={deleteDesigner} />
+      : null}
+
+      {tab === "home" ?
+        <Dashboard
+          orders={orders}
+          events={events}
+          purchaseOrders={purchaseOrders}
+          onOrderClick={function(o){ setSelected(o); setTab("orders"); }}
+          onGoToCalendar={function(){ setTab("calendar"); }}
+          onPOClick={function(po){ setSelectedPO(po); setTab("po"); }}
+        />
       : null}
 
       {tab === "installers" ?
