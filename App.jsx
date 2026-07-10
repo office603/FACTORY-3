@@ -409,14 +409,36 @@ function PrintablePurchaseOrder(props) {
     + (po.notes ? "<div class=\"notes\"><b>הערות להזמנה:</b><br>" + esc(po.notes) + "</div>" : "")
     + "<div style=\"margin-top:30px;font-size:11px;color:#94a3b8;text-align:center;\">נוצר אוטומטית ממערכת ניהול ההזמנות</div>"
     + "</body></html>";
-  var dataHref = "data:text/html;charset=utf-8," + encodeURIComponent(docHtml);
+
+  var [showIframe, setShowIframe] = useState(false);
+  var blobUrl = useRef(null);
+
+  function openDoc() {
+    try {
+      var blob = new Blob([docHtml], {type:"text/html;charset=utf-8"});
+      if (blobUrl.current) URL.revokeObjectURL(blobUrl.current);
+      blobUrl.current = URL.createObjectURL(blob);
+      window.open(blobUrl.current, "_blank");
+    } catch(e) {
+      setShowIframe(true);
+    }
+  }
 
   return (
     <div id="print-po-root" style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#fff",zIndex:9999,overflow:"auto",padding:30,direction:"rtl",fontFamily:"Arial, 'Segoe UI', sans-serif",color:"#0f172a"}}>
       <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}} className="no-print">
-        <a href={dataHref} target="_blank" rel="noopener noreferrer" download={po.id + "-הזמנת-רכש.html"} style={{padding:"10px 20px",background:"#4338ca",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14,textDecoration:"none",display:"inline-block"}}>פתח / שתף מסמך</a>
+        <button onClick={function(){setShowIframe(true);}} style={{padding:"10px 20px",background:"#4338ca",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>📄 הצג מסמך</button>
         <button onClick={props.onClose} style={{padding:"10px 20px",background:"#f1f5f9",color:"#475569",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14}}>סגור</button>
       </div>
+      {showIframe ?
+        <div style={{position:"fixed",inset:0,background:"#fff",zIndex:10002,display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"10px 16px",background:"#4338ca",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:"#fff",fontWeight:700,fontSize:14}}>{po.id + " — " + po.supplier}</span>
+            <button onClick={function(){setShowIframe(false);}} style={{background:"rgba(255,255,255,0.2)",color:"#fff",border:"none",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:700}}>סגור</button>
+          </div>
+          <iframe srcDoc={docHtml} style={{flex:1,border:"none",width:"100%"}} title="תצוגה מקדימה" />
+        </div>
+      : null}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:"3px solid #4338ca",paddingBottom:14,marginBottom:20}}>
         <div>
           <h1 style={{margin:0,fontSize:20,color:"#1e1b4b"}}>{props.factoryName}</h1>
@@ -4179,9 +4201,11 @@ export default function App() {
             <button onClick={function(){setCalendarSubTab("factory");}} style={{padding:"10px 20px",background:calendarSubTab==="factory"?"#3b82f6":"#fff",color:calendarSubTab==="factory"?"#fff":"#64748b",border:"none",cursor:"pointer",fontWeight:700,fontSize:13}}>
               🚚 הובלות והתקנות
             </button>
-            <button onClick={function(){setCalendarSubTab("showroom");}} style={{padding:"10px 20px",background:calendarSubTab==="showroom"?"#8b5cf6":"#fff",color:calendarSubTab==="showroom"?"#fff":"#64748b",border:"none",cursor:"pointer",fontWeight:700,fontSize:13}}>
-              🏠 יומן תצוגה
-            </button>
+            {currentUser.role !== "installer" ?
+              <button onClick={function(){setCalendarSubTab("showroom");}} style={{padding:"10px 20px",background:calendarSubTab==="showroom"?"#8b5cf6":"#fff",color:calendarSubTab==="showroom"?"#fff":"#64748b",border:"none",cursor:"pointer",fontWeight:700,fontSize:13}}>
+                🏠 יומן תצוגה
+              </button>
+            : null}
           </div>
           <WeeklyCalendar
             events={events.filter(function(e){
