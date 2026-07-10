@@ -2535,6 +2535,75 @@ function OrderDetail(props) {
   );
 }
 
+function OrderSearchPicker(props) {
+  var orders = props.orders || [];
+  var [query, setQuery] = useState("");
+  var [open, setOpen] = useState(false);
+
+  var selected = orders.find(function(o){ return o.id === props.value; });
+
+  var filtered = query.trim()
+    ? orders.filter(function(o){
+        var q = query.trim().toLowerCase();
+        return o.id.toLowerCase().indexOf(q) >= 0 || o.client.toLowerCase().indexOf(q) >= 0;
+      })
+    : orders;
+
+  function select(o) {
+    props.onChange(o.id);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function clear() {
+    props.onChange("");
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div style={{position:"relative"}}>
+      {selected && !open ?
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",border:"1.5px solid "+(props.error?"#ef4444":"#4338ca"),borderRadius:8,background:"#eef2ff",cursor:"pointer"}} onClick={function(){setOpen(true);}}>
+          <span style={{fontSize:14,fontWeight:700,color:"#4338ca"}}>{selected.id + " — " + selected.client}</span>
+          <button onClick={function(e){e.stopPropagation();clear();}} style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:16,padding:"0 4px"}}>✕</button>
+        </div>
+      :
+        <div>
+          <input
+            value={query}
+            onChange={function(e){setQuery(e.target.value);setOpen(true);}}
+            onFocus={function(){setOpen(true);}}
+            onBlur={function(){setTimeout(function(){setOpen(false);},150);}}
+            style={Object.assign({},inpStyle,{border:"1.5px solid "+(props.error?"#ef4444":"#e2e8f0")})}
+            placeholder="חפש לפי שם לקוח או מספר הזמנה..."
+          />
+          {open && filtered.length > 0 ?
+            <div style={{position:"absolute",top:"100%",right:0,left:0,background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",zIndex:1000,maxHeight:220,overflowY:"auto",direction:"rtl"}}>
+              {filtered.slice(0,10).map(function(o){
+                var s = getStatus(o.status);
+                return (
+                  <div key={o.id} onMouseDown={function(){select(o);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                    onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
+                    onMouseLeave={function(e){e.currentTarget.style.background="#fff";}}>
+                    <div>
+                      <span style={{fontSize:12,color:"#94a3b8",fontWeight:600,marginLeft:8}}>{o.id}</span>
+                      <span style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{o.client}</span>
+                    </div>
+                    <span style={{background:s.bg,color:s.color,borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>{s.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          : open && query && filtered.length === 0 ?
+            <div style={{position:"absolute",top:"100%",right:0,left:0,background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"16px",textAlign:"center",color:"#94a3b8",fontSize:13,zIndex:1000}}>לא נמצאו הזמנות</div>
+          : null}
+        </div>
+      }
+    </div>
+  );
+}
+
 function EventForm(props) {
   var orders = props.orders;
   var users = props.users || [];
@@ -2586,10 +2655,12 @@ function EventForm(props) {
       </div>
       <div style={{marginBottom:14}}>
         <label style={{fontSize:12,fontWeight:700,color:"#475569",display:"block",marginBottom:5}}>הזמנה *</label>
-        <select value={form.orderId} onChange={function(e){set("orderId",e.target.value);}} style={Object.assign({},inpStyle,{cursor:"pointer",border:"1.5px solid "+(errors.orderId?"#ef4444":"#e2e8f0")})}>
-          <option value="">-- בחר הזמנה --</option>
-          {orders.map(function(o){ return <option key={o.id} value={o.id}>{o.id + " - " + o.client}</option>; })}
-        </select>
+        <OrderSearchPicker
+          orders={orders}
+          value={form.orderId}
+          onChange={function(id){set("orderId",id);}}
+          error={errors.orderId}
+        />
         {selOrder ? <div style={{marginTop:6,padding:"6px 10px",background:"#f0f9ff",borderRadius:7,fontSize:12,color:"#0369a1"}}>{"📍 " + selOrder.address}</div> : null}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
