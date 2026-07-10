@@ -12,9 +12,15 @@ const STATUSES = [
 ];
 
 const EVENT_TYPES = [
-  { id:"delivery",     label:"הובלה",      color:"#3b82f6", icon:"🚚" },
-  { id:"installation", label:"התקנה",      color:"#10b981", icon:"🔧" },
-  { id:"completion",   label:"סיום התקנה", color:"#f97316", icon:"✅" },
+  { id:"delivery",     label:"הובלה",              color:"#3b82f6", icon:"🚚", calendar:"factory" },
+  { id:"installation", label:"התקנה",              color:"#10b981", icon:"🔧", calendar:"factory" },
+  { id:"completion",   label:"סיום התקנה",          color:"#f97316", icon:"✅", calendar:"factory" },
+  { id:"meeting",      label:"פגישה",              color:"#8b5cf6", icon:"🤝", calendar:"showroom" },
+  { id:"meeting_exec", label:"פגישות הורדה לביצוע", color:"#f59e0b", icon:"📋", calendar:"showroom" },
+  { id:"unavailable",  label:"לא זמין",             color:"#ef4444", icon:"🚫", calendar:"showroom" },
+  { id:"designer",     label:"פגישת מעצב/ת",       color:"#ec4899", icon:"✏️", calendar:"showroom" },
+  { id:"tour",         label:"סיור בתצוגה",         color:"#06b6d4", icon:"🏠", calendar:"showroom" },
+  { id:"other_show",   label:"אחר",                color:"#94a3b8", icon:"📅", calendar:"showroom" },
 ];
 
 const HE_DAYS = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
@@ -2490,8 +2496,10 @@ function OrderDetail(props) {
 function EventForm(props) {
   var orders = props.orders;
   var users = props.users || [];
+  var calendarType = props.calendarType || "factory";
+  var availableTypes = EVENT_TYPES.filter(function(t){ return t.calendar === calendarType; });
   var installers = users.filter(function(u){ return u.role==="installer" && u.active; });
-  var [form, setForm] = useState(props.initial || {id:makeId("EVT"),type:"installation",orderId:"",date:"",time:"08:00",team:"",teamIds:[],notes:""});
+  var [form, setForm] = useState(props.initial || {id:makeId("EVT"),type:availableTypes[0]?availableTypes[0].id:"installation",orderId:"",date:"",time:"08:00",team:"",teamIds:[],notes:""});
   var [errors, setErrors] = useState({});
   function set(k,v){ setForm(function(f){ return Object.assign({},f,{[k]:v}); }); }
 
@@ -2516,7 +2524,7 @@ function EventForm(props) {
     var e = {};
     if (!form.orderId) e.orderId = "חובה";
     if (!form.date) e.date = "חובה";
-    if (!(form.teamIds||[]).length && !form.team.trim() && form.type !== "delivery") e.team = "חובה";
+    if (!(form.teamIds||[]).length && !form.team.trim() && form.type !== "delivery" && calendarType !== "showroom") e.team = "חובה";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -2525,7 +2533,7 @@ function EventForm(props) {
     <div style={{padding:28}}>
       <h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:800,color:"#0f172a"}}>אירוע ביומן</h2>
       <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {EVENT_TYPES.map(function(t){
+        {availableTypes.map(function(t){
           return (
             <button key={t.id} onClick={function(){set("type",t.id);}}
               style={{flex:1,padding:"10px 8px",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,border:form.type===t.id?"2px solid "+t.color:"2px solid #e2e8f0",background:form.type===t.id?t.color+"15":"#f8fafc",color:form.type===t.id?t.color:"#64748b"}}>
@@ -2552,7 +2560,7 @@ function EventForm(props) {
           <input type="time" value={form.time} onChange={function(e){set("time",e.target.value);}} style={inpStyle} />
         </div>
       </div>
-      {form.type !== "delivery" ?
+      {form.type !== "delivery" && calendarType !== "showroom" ?
         <div style={{marginBottom:14}}>
           <label style={{fontSize:12,fontWeight:700,color:"#475569",display:"block",marginBottom:8}}>צוות / מתקינים *{errors.team ? <span style={{color:"#ef4444",marginRight:6,fontWeight:400}}>{errors.team}</span> : null}</label>
           {installers.length > 0 ?
@@ -2587,85 +2595,143 @@ function EventForm(props) {
 function WeeklyCalendar(props) {
   var events = props.events;
   var orders = props.orders;
+  var [viewMode, setViewMode] = useState("week");
   var [weekOf, setWeekOf] = useState(function(){ return weekStart(new Date()); });
-  var days = [];
-  for (var di = 0; di < 7; di++) { days.push(addDays(weekOf, di)); }
+  var [selectedDay, setSelectedDay] = useState(new Date());
+  var [monthOf, setMonthOf] = useState(function(){ var d=new Date(); return new Date(d.getFullYear(),d.getMonth(),1); });
   var todayStr = toISO(new Date());
-  var wStart = toISO(weekOf);
-  var wEnd = toISO(addDays(weekOf, 6));
-  var weekEvs = events.filter(function(e){ return e.date >= wStart && e.date <= wEnd; });
+  var HE_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+
+  var days = [];
+  for (var di=0; di<7; di++) { days.push(addDays(weekOf,di)); }
+  var wStart = toISO(weekOf); var wEnd = toISO(addDays(weekOf,6));
+
   function evDay(ds) {
-    return weekEvs.filter(function(e){ return e.date === ds; }).sort(function(a,b){ return a.time > b.time ? 1 : -1; });
+    return events.filter(function(e){ return e.date===ds; }).sort(function(a,b){ return a.time>b.time?1:-1; });
   }
+
+  var dayStr = toISO(selectedDay);
+  var monthYear = monthOf.getFullYear(); var monthMonth = monthOf.getMonth();
+  var firstDay = new Date(monthYear, monthMonth, 1);
+  var lastDay = new Date(monthYear, monthMonth+1, 0);
+  var monthDays = [];
+  for (var md=1; md<=lastDay.getDate(); md++) { monthDays.push(new Date(monthYear,monthMonth,md)); }
+
+  function navigate(dir) {
+    if (viewMode==="week") setWeekOf(function(w){return addDays(w,dir*7);});
+    else if (viewMode==="day") setSelectedDay(function(d){return addDays(d,dir);});
+    else setMonthOf(function(m){return new Date(m.getFullYear(),m.getMonth()+dir,1);});
+  }
+
+  function navLabel() {
+    if (viewMode==="day") return fmtDate(dayStr);
+    if (viewMode==="week") return fmtDate(wStart)+" - "+fmtDate(wEnd);
+    return HE_MONTHS[monthMonth]+" "+monthYear;
+  }
+
+  function EvCard(ep) {
+    var ev = ep.ev;
+    var t = getEvType(ev.type);
+    var ord = orders.find(function(o){return o.id===ev.orderId;});
+    return (
+      <div onClick={function(){props.onEditEvent(ev);}} style={{background:t.color+"18",borderRight:"3px solid "+t.color,borderRadius:8,padding:"8px 10px",marginBottom:6,cursor:"pointer"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{t.icon+" "+t.label}</span>
+          {ev.time?<span style={{fontSize:11,color:"#64748b"}}>{ev.time}</span>:null}
+        </div>
+        {ord?<div style={{fontSize:12,color:"#475569",marginTop:2}}>{ord.client}</div>:null}
+        {ev.team?<div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{"👷 "+ev.team}</div>:null}
+      </div>
+    );
+  }
+
   return (
     <div style={{direction:"rtl"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",background:"#fff",borderBottom:"1px solid #e2e8f0"}}>
-        <button onClick={function(){ setWeekOf(function(w){ return addDays(w,-7); }); }} style={{padding:"8px 14px",border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",cursor:"pointer",fontWeight:700,color:"#475569",fontSize:13}}>קודם</button>
-        <div style={{textAlign:"center"}}>
-          <div style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>{fmtDate(wStart) + " - " + fmtDate(wEnd)}</div>
-          <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{weekEvs.length + " אירועים"}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",background:"#fff",borderBottom:"1px solid #e2e8f0",flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",gap:0,borderRadius:10,overflow:"hidden",border:"1.5px solid #e2e8f0"}}>
+          {[{id:"day",label:"יומי"},{id:"week",label:"שבועי"},{id:"month",label:"חודשי"}].map(function(v){
+            return <button key={v.id} onClick={function(){setViewMode(v.id);}} style={{padding:"7px 14px",background:viewMode===v.id?"#4f46e5":"#fff",color:viewMode===v.id?"#fff":"#64748b",border:"none",cursor:"pointer",fontWeight:700,fontSize:12}}>{v.label}</button>;
+          })}
         </div>
-        <button onClick={function(){ setWeekOf(function(w){ return addDays(w,7); }); }} style={{padding:"8px 14px",border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",cursor:"pointer",fontWeight:700,color:"#475569",fontSize:13}}>הבא</button>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={function(){navigate(-1);}} style={{padding:"7px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",cursor:"pointer",fontWeight:700,color:"#475569"}}>◀</button>
+          <div style={{fontSize:13,fontWeight:800,color:"#0f172a",textAlign:"center",minWidth:140}}>{navLabel()}</div>
+          <button onClick={function(){navigate(1);}} style={{padding:"7px 12px",border:"1.5px solid #e2e8f0",borderRadius:8,background:"#fff",cursor:"pointer",fontWeight:700,color:"#475569"}}>▶</button>
+        </div>
       </div>
-      <div style={{display:"flex",gap:6,padding:"10px 16px",background:"#fff",borderBottom:"1px solid #e2e8f0",overflowX:"auto"}}>
-        {days.map(function(day, i){
-          var ds = toISO(day);
-          var isT = ds === todayStr;
-          var cnt = evDay(ds).length;
-          return (
-            <div key={ds} style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:40,opacity:i===6?0.4:1}}>
-              <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,marginBottom:3}}>{HE_DAYS[i]}</div>
-              <div style={{width:34,height:34,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isT?"#4f46e5":"#f1f5f9",color:isT?"#fff":"#0f172a",fontWeight:800,fontSize:14}}>{day.getDate()}</div>
-              {cnt > 0 ? <div style={{marginTop:3,background:"#ef4444",color:"#fff",borderRadius:99,fontSize:9,fontWeight:800,padding:"1px 5px"}}>{cnt}</div> : null}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{padding:"16px 16px 32px"}}>
-        {days.map(function(day, i){
-          if (i === 6) return null;
-          var ds = toISO(day);
-          var isT = ds === todayStr;
-          var dayEvs = evDay(ds);
-          return (
-            <div key={ds} style={{marginBottom:16}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isT?"#4f46e5":"#e2e8f0",color:isT?"#fff":"#64748b",fontWeight:800,fontSize:13}}>{day.getDate()}</div>
-                  <span style={{fontSize:14,fontWeight:800,color:isT?"#4f46e5":"#0f172a"}}>{HE_DAYS[i] + (isT ? " - היום" : "")}</span>
+
+      {viewMode==="day" ?
+        <div style={{padding:"16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontWeight:800,fontSize:15,color:"#0f172a"}}>{HE_DAYS[selectedDay.getDay()]+", "+selectedDay.getDate()+" "+HE_MONTHS[selectedDay.getMonth()]}</div>
+            <button onClick={function(){props.onAddEvent(dayStr);}} style={{padding:"6px 12px",background:"#4f46e5",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12}}>+ הוסף</button>
+          </div>
+          {evDay(dayStr).length===0?<div style={{textAlign:"center",padding:"40px",color:"#94a3b8",fontSize:13}}>אין אירועים היום</div>:evDay(dayStr).map(function(ev){return <EvCard key={ev.id} ev={ev}/>;}) }
+        </div>
+      :null}
+
+      {viewMode==="week" ?
+        <div>
+          <div style={{display:"flex",gap:6,padding:"10px 16px",background:"#fff",borderBottom:"1px solid #e2e8f0",overflowX:"auto"}}>
+            {days.map(function(day,i){
+              var ds=toISO(day); var isT=ds===todayStr; var cnt=evDay(ds).length;
+              return (
+                <div key={ds} onClick={function(){setSelectedDay(day);setViewMode("day");}} style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:40,cursor:"pointer",opacity:i===6?0.4:1}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,marginBottom:3}}>{HE_DAYS[i]}</div>
+                  <div style={{width:34,height:34,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isT?"#4f46e5":"#f1f5f9",color:isT?"#fff":"#0f172a",fontWeight:800,fontSize:14}}>{day.getDate()}</div>
+                  {cnt>0?<div style={{marginTop:3,background:"#ef4444",color:"#fff",borderRadius:99,fontSize:9,fontWeight:800,padding:"1px 5px"}}>{cnt}</div>:null}
                 </div>
-                <button onClick={function(){ props.onAddEvent(ds); }} style={{padding:"5px 12px",border:"1.5px dashed #cbd5e1",borderRadius:8,background:"transparent",cursor:"pointer",fontSize:12,color:"#94a3b8",fontWeight:600}}>+ הוסף</button>
-              </div>
-              {dayEvs.length === 0 ?
-                <div style={{padding:"8px 12px",background:"#f8fafc",borderRadius:8,fontSize:12,color:"#cbd5e1",textAlign:"center"}}>אין אירועים</div>
-              :
-                dayEvs.map(function(ev){
-                  var t = getEvType(ev.type);
-                  var ord = orders.find(function(o){ return o.id === ev.orderId; });
-                  return (
-                    <div key={ev.id} onClick={function(){ props.onEditEvent(ev); }}
-                      style={{background:"#fff",borderRadius:12,padding:"12px 16px",marginBottom:8,cursor:"pointer",border:"1.5px solid "+t.color+"33",borderRight:"4px solid "+t.color,boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                        <span style={{background:t.color+"15",color:t.color,borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:700}}>{t.icon + " " + t.label}</span>
-                        <span style={{fontSize:15,fontWeight:900,color:"#0f172a"}}>{ev.time}</span>
-                      </div>
-                      <div style={{fontSize:14,fontWeight:800,color:"#0f172a",marginBottom:2}}>{ord ? ord.client : ev.orderId}</div>
-                      {ord ? <div style={{fontSize:12,color:"#64748b",marginBottom:2}}>{"📍 " + ord.address}</div> : null}
-                      {ev.team ? <div style={{fontSize:12,color:"#64748b"}}>{"👷 " + ev.team}</div> : null}
-                      <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
-                        <button onClick={function(e){ e.stopPropagation(); props.onDeleteEvent(ev.id); }} style={{padding:"4px 10px",background:"#fef2f2",color:"#ef4444",border:"none",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>מחק</button>
-                      </div>
-                    </div>
-                  );
-                })
-              }
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+          <div style={{padding:"16px 16px 32px"}}>
+            {days.map(function(day,i){
+              if(i===6) return null;
+              var ds=toISO(day); var isT=ds===todayStr; var devs=evDay(ds);
+              if(devs.length===0) return null;
+              return (
+                <div key={ds} style={{marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isT?"#4f46e5":"#e2e8f0",color:isT?"#fff":"#64748b",fontWeight:800,fontSize:13}}>{day.getDate()}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:isT?"#4f46e5":"#475569"}}>{HE_DAYS[i]}</div>
+                  </div>
+                  {devs.map(function(ev){return <EvCard key={ev.id} ev={ev}/>;}) }
+                </div>
+              );
+            })}
+            {events.filter(function(e){return e.date>=wStart&&e.date<=wEnd;}).length===0?<div style={{textAlign:"center",padding:"40px",color:"#94a3b8",fontSize:13}}>אין אירועים השבוע</div>:null}
+          </div>
+        </div>
+      :null}
+
+      {viewMode==="month" ?
+        <div style={{padding:"12px 16px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:6}}>
+            {HE_DAYS.map(function(d,i){return <div key={i} style={{textAlign:"center",fontSize:10,fontWeight:700,color:"#94a3b8",padding:"4px 0"}}>{d}</div>;})}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+            {Array(firstDay.getDay()).fill(null).map(function(_,i){return <div key={"e"+i}/>;}) }
+            {monthDays.map(function(day){
+              var ds=toISO(day); var cnt=evDay(ds).length; var isT=ds===todayStr;
+              return (
+                <div key={ds} onClick={function(){setSelectedDay(day);setViewMode("day");}}
+                  style={{minHeight:48,borderRadius:8,background:isT?"#eef2ff":"#f8fafc",border:"1px solid "+(isT?"#6366f1":"#e2e8f0"),cursor:"pointer",padding:4,position:"relative"}}>
+                  <div style={{fontSize:12,fontWeight:800,color:isT?"#4f46e5":"#475569"}}>{day.getDate()}</div>
+                  {cnt>0?<div style={{position:"absolute",top:3,left:3,background:"#ef4444",color:"#fff",borderRadius:"50%",width:15,height:15,fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{cnt}</div>:null}
+                  {evDay(ds).slice(0,2).map(function(ev){
+                    var t=getEvType(ev.type);
+                    return <div key={ev.id} style={{fontSize:9,background:t.color+"22",color:t.color,borderRadius:3,padding:"1px 3px",marginTop:2,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{t.icon+" "+t.label}</div>;
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      :null}
     </div>
   );
 }
+
 
 function PurchaseOrderCard(props) {
   var po = props.po;
@@ -3708,7 +3774,11 @@ export default function App() {
   var [factoryName, setFactoryName] = useLocalStorage("fac_name", "מפעל הנגרות");
   var [editingName, setEditingName] = useState(false);
   var [nameInput, setNameInput] = useState("");
-  var [tab, setTab] = useState("orders");
+  var [tab, setTab] = useState(function(){
+    var role = currentUser ? currentUser.role : "viewer";
+    if (role === "installer") return "calendar";
+    return "orders";
+  });
   var [orders, setOrders] = useLocalStorage("fac_orders", INIT_ORDERS);
   var [events, setEvents] = useLocalStorage("fac_events", INIT_EVENTS);
   var [users, setUsers] = useLocalStorage("fac_users", INIT_USERS);
@@ -3778,6 +3848,7 @@ export default function App() {
   var [filterStatus, setFilterStatus] = useState("all");
   var [editingEvent, setEditingEvent] = useState(null);
   var [newEventDate, setNewEventDate] = useState(null);
+  var [calendarSubTab, setCalendarSubTab] = useState("factory");
   var [printingOrder, setPrintingOrder] = useState(null);
   var [addingReportTo, setAddingReportTo] = useState(null);
   var [viewingReport, setViewingReport] = useState(null);
@@ -3931,6 +4002,19 @@ export default function App() {
   var isAdmin = currentUser.role === "admin";
   var currentRole = ROLE_PRESETS[currentUser.role] || ROLE_PRESETS.viewer;
 
+  // Tabs visible per role
+  var TAB_PERMISSIONS = {
+    admin:      ["orders","calendar","catalog","po","quotes","customers","designers","installers","reports","admin"],
+    purchasing: ["orders","calendar","catalog","po","quotes","customers","designers","installers"],
+    installer:  ["calendar","installers"],
+    office:     ["orders","calendar","quotes","customers","designers"],
+    designer:   ["orders","calendar","quotes","customers","designers"],
+    viewer:     ["orders","calendar","installers"],
+  };
+
+  var currentRoleKey = currentUser ? currentUser.role : "viewer";
+  var allowedTabs = TAB_PERMISSIONS[currentRoleKey] || TAB_PERMISSIONS.viewer;
+
   var TABS = [
     {id:"orders",     label:"הזמנות"},
     {id:"calendar",   label:"יומן"},
@@ -3940,7 +4024,7 @@ export default function App() {
     {id:"customers",  label:"לקוחות"},
     {id:"designers",  label:"מעצבים"},
     {id:"installers", label:"מתקינים"},
-  ];
+  ].filter(function(t){ return allowedTabs.indexOf(t.id) >= 0; });
   if (isAdmin) TABS.push({id:"reports", label:"דוחות"});
   if (isAdmin) TABS.push({id:"admin", label:"משתמשים"});
 
@@ -4071,7 +4155,25 @@ export default function App() {
 
       {tab === "calendar" ?
         <div style={{maxWidth:1100,margin:"0 auto",paddingTop:8}}>
-          <WeeklyCalendar events={events} orders={orders} onAddEvent={setNewEventDate} onEditEvent={setEditingEvent} onDeleteEvent={deleteEvent} />
+          <div style={{display:"flex",gap:0,margin:"0 28px 16px",borderRadius:12,overflow:"hidden",border:"1.5px solid #e2e8f0",width:"fit-content"}}>
+            <button onClick={function(){setCalendarSubTab("factory");}} style={{padding:"10px 20px",background:calendarSubTab==="factory"?"#3b82f6":"#fff",color:calendarSubTab==="factory"?"#fff":"#64748b",border:"none",cursor:"pointer",fontWeight:700,fontSize:13}}>
+              🚚 הובלות והתקנות
+            </button>
+            <button onClick={function(){setCalendarSubTab("showroom");}} style={{padding:"10px 20px",background:calendarSubTab==="showroom"?"#8b5cf6":"#fff",color:calendarSubTab==="showroom"?"#fff":"#64748b",border:"none",cursor:"pointer",fontWeight:700,fontSize:13}}>
+              🏠 יומן תצוגה
+            </button>
+          </div>
+          <WeeklyCalendar
+            events={events.filter(function(e){
+              var t = EVENT_TYPES.find(function(x){return x.id===e.type;});
+              var cal = t ? t.calendar : "factory";
+              return calendarSubTab === "showroom" ? cal==="showroom" : cal==="factory";
+            })}
+            orders={orders}
+            onAddEvent={setNewEventDate}
+            onEditEvent={setEditingEvent}
+            onDeleteEvent={deleteEvent}
+          />
         </div>
       : null}
 
@@ -4172,7 +4274,8 @@ export default function App() {
       {newEventDate || editingEvent ?
         <Modal onClose={function(){setNewEventDate(null);setEditingEvent(null);}} wide={true}>
           <EventForm
-            initial={editingEvent || (newEventDate ? {id:makeId("EVT"),type:"installation",orderId:"",date:newEventDate,time:"08:00",team:"",teamIds:[],notes:""} : null)}
+            initial={editingEvent || (newEventDate ? {id:makeId("EVT"),type:calendarSubTab==="showroom"?"meeting":"installation",orderId:"",date:newEventDate,time:"08:00",team:"",teamIds:[],notes:""} : null)}
+            calendarType={calendarSubTab}
             orders={orders}
             users={users}
             onSave={saveEvent}
