@@ -76,9 +76,15 @@ function addDays(d, n) {
   return x;
 }
 function toISO(d) { return d.toISOString().slice(0,10); }
+var HE_MONTHS_SHORT = ["ינו׳","פבר׳","מרץ","אפר׳","מאי","יוני","יולי","אוג׳","ספט׳","אוק׳","נוב׳","דצמ׳"];
 function fmtDate(s) {
+  if (!s) return "";
   var parts = s.split("-");
-  return parts[2] + "/" + parts[1] + "/" + parts[0];
+  if (parts.length < 3) return s;
+  var d = parseInt(parts[2],10);
+  var m = parseInt(parts[1],10) - 1;
+  var y = parts[0];
+  return d + " " + HE_MONTHS_SHORT[m] + " " + y;
 }
 function makeId(prefix) {
   return prefix + "-" + String(Math.floor(Math.random()*9000)+1000);
@@ -133,6 +139,7 @@ var TABLE_MAP = {
   "fac_users":           { table:"fac_users",           isArray:true,  idField:"id" },
   "fac_price_catalog":   { table:"fac_price_catalog",   isArray:false, idField:"key" },
   "fac_name":            { table:"fac_settings",        isArray:false, idField:"key", settingKey:"fac_name" },
+  "fac_logo":            { table:"fac_settings",        isArray:false, idField:"key", settingKey:"fac_logo" },
 };
 
 async function sbLoadArray(table) {
@@ -1164,91 +1171,176 @@ function CustomerForm(props) {
 function CustomerDetail(props) {
   var c = props.customer;
   var relatedOrders = props.relatedOrders || [];
+  var relatedQuotes = props.relatedQuotes || [];
+  var [activeTab, setActiveTab] = useState("info");
   var [confirmDelete, setConfirmDelete] = useState(false);
+  var [viewingFile, setViewingFile] = useState(null);
+  var [customerFiles, setCustomerFiles] = useState(c.customerFiles || []);
+  var fileRef = useRef();
+
+  function handleFileUpload(e) {
+    var files = Array.from(e.target.files);
+    files.forEach(function(file){
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var newFile = {id:makeId("CF"),name:file.name,type:file.type,data:ev.target.result,created:toISO(new Date())};
+        setCustomerFiles(function(prev){
+          var updated = prev.concat([newFile]);
+          props.onUpdateFiles(updated);
+          return updated;
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }
+
+  var TABS_C = [
+    {id:"info",    label:"פרטים"},
+    {id:"orders",  label:"הזמנות (" + relatedOrders.length + ")"},
+    {id:"quotes",  label:"הצעות (" + relatedQuotes.length + ")"},
+    {id:"files",   label:"קבצים (" + customerFiles.length + ")"},
+  ];
 
   return (
-    <Modal onClose={props.onClose}>
-      <div style={{padding:"28px 28px 0"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+    <Modal onClose={props.onClose} wide={true}>
+      <div style={{padding:"20px 24px 0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
           <div>
-            <h2 style={{margin:"0 0 6px",fontSize:22,fontWeight:900,color:"#0f172a",unicodeBidi:"plaintext"}}>{c.name}</h2>
-            {c.source ? <span style={{background:"#eff6ff",color:"#1d4ed8",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:700}}>{c.source}</span> : null}
+            <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#0f172a"}}>{c.name}</h2>
+            {c.source ? <span style={{background:"#eff6ff",color:"#1d4ed8",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{c.source+(c.sourceNote?" · "+c.sourceNote:"")}</span> : null}
           </div>
           <button onClick={props.onClose} style={{background:"#f1f5f9",border:"none",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:18,color:"#64748b"}}>x</button>
         </div>
+        <div style={{display:"flex",gap:0,borderBottom:"2px solid #f1f5f9"}}>
+          {TABS_C.map(function(t){
+            return <button key={t.id} onClick={function(){setActiveTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",borderBottom:activeTab===t.id?"2px solid #4338ca":"2px solid transparent",color:activeTab===t.id?"#4338ca":"#64748b",fontWeight:activeTab===t.id?800:600,fontSize:13,cursor:"pointer",marginBottom:-2}}>{t.label}</button>;
+          })}
+        </div>
       </div>
-      <div style={{padding:"16px 28px 28px"}}>
-        <div style={{marginBottom:14}}>
-          <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:8}}>
-            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:6}}>טלפון ראשי</div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{c.phone}</span>
-              <div style={{display:"flex",gap:6}}>
-                <a href={"https://wa.me/972" + c.phone.replace(/^0/,"").replace(/[-\s]/g,"")} target="_blank" rel="noopener noreferrer"
-                  style={{textDecoration:"none"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
-                <a href={"tel:" + c.phone}
-                  style={{textDecoration:"none"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="#3b82f6"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></a>
-              </div>
-            </div>
-          </div>
 
-          {(c.extraPhones||[]).map(function(p,i){
-            return (
-              <div key={i} style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px",marginBottom:8}}>
-                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:6}}>{p.name || ("איש קשר " + (i+1))}</div>
+      <div style={{padding:"16px 24px 24px",maxHeight:"60vh",overflowY:"auto"}}>
+
+        {/* טאב פרטים */}
+        {activeTab==="info" ?
+          <div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+              <div style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
+                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:6}}>טלפון ראשי</div>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{p.phone}</span>
+                  <span style={{fontSize:14,fontWeight:700}}>{c.phone}</span>
                   <div style={{display:"flex",gap:6}}>
-                    <a href={"https://wa.me/972" + p.phone.replace(/^0/,"").replace(/[-\s]/g,"")} target="_blank" rel="noopener noreferrer"
-                      style={{textDecoration:"none"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
-                    <a href={"tel:" + p.phone}
-                      style={{textDecoration:"none"}}><svg width="20" height="20" viewBox="0 0 24 24" fill="#3b82f6"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></a>
+                    <a href={"https://wa.me/972"+c.phone.replace(/^0/,"").replace(/[-\s]/g,"")} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+                    <a href={"tel:"+c.phone} style={{textDecoration:"none"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="#3b82f6"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></a>
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {c.address ?
-          <a href={"https://waze.com/ul?q=" + encodeURIComponent(c.address) + "&navigate=yes"} target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"10px 14px",marginBottom:14,textDecoration:"none"}}>
-            <div>
-              <div style={{fontSize:11,color:"#0369a1",fontWeight:700,marginBottom:3}}>כתובת</div>
-              <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{c.address}</div>
+              {(c.extraPhones||[]).map(function(p,i){
+                return (
+                  <div key={i} style={{background:"#f8fafc",borderRadius:10,padding:"10px 14px"}}>
+                    <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:6}}>{p.name||("איש קשר "+(i+1))}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:14,fontWeight:700}}>{p.phone}</span>
+                      <div style={{display:"flex",gap:6}}>
+                        <a href={"https://wa.me/972"+p.phone.replace(/^0/,"").replace(/[-\s]/g,"")} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>
+                        <a href={"tel:"+p.phone} style={{textDecoration:"none"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="#3b82f6"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <svg width="24" height="24" viewBox="0 0 48 48" fill="#05c8f0"><path d="M24 4C13 4 4 13 4 24c0 4.8 1.7 9.2 4.5 12.7L7 42l5.5-1.4C15.5 42.7 19.6 44 24 44c11 0 20-9 20-20S35 4 24 4zm0 36c-3.7 0-7.2-1.1-10.1-3l-.7-.4-4.4 1.1 1.2-4.2-.5-.7C7.9 30.1 7 27.1 7 24 7 14.6 14.6 7 24 7s17 7.6 17 17-7.6 16-17 16zm-2-22a2 2 0 100-4 2 2 0 000 4zm8 0a2 2 0 100-4 2 2 0 000 4zm-4 12c-4 0-7.4-2.6-8.6-6.2l2.8-.9c.8 2.5 3.1 4.1 5.8 4.1s5-1.6 5.8-4.1l2.8.9C33.4 27.4 30 30 26 30z"/></svg>
-          </a>
+            {c.address ?
+              <a href={"https://waze.com/ul?q="+encodeURIComponent(c.address)+"&navigate=yes"} target="_blank" rel="noopener noreferrer"
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"10px 14px",marginBottom:12,textDecoration:"none"}}>
+                <div>
+                  <div style={{fontSize:11,color:"#0369a1",fontWeight:700,marginBottom:3}}>כתובת</div>
+                  <div style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{c.address}</div>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28"><ellipse cx="32" cy="38" rx="26" ry="20" fill="#00BFFF"/><ellipse cx="32" cy="36" rx="24" ry="18" fill="#33CCFF"/><circle cx="22" cy="32" r="5" fill="white"/><circle cx="42" cy="32" r="5" fill="white"/><circle cx="22" cy="32" r="3" fill="#1a1a2e"/><circle cx="42" cy="32" r="3" fill="#1a1a2e"/><path d="M24 42 Q32 48 40 42" stroke="#1a1a2e" strokeWidth="2" fill="none" strokeLinecap="round"/></svg>
+              </a>
+            : null}
+            {c.notes ? <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 12px",fontSize:13,color:"#92400e"}}>{"📝 "+c.notes}</div> : null}
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+              <button onClick={function(){setConfirmDelete(true);}} style={{padding:"10px 16px",background:"#fef2f2",color:"#ef4444",border:"1px solid #fecaca",borderRadius:10,cursor:"pointer",fontWeight:700}}>מחק</button>
+              <button onClick={function(){props.onEdit(c);}} style={{padding:"10px 20px",background:"linear-gradient(135deg,#6366f1,#4f46e5)",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800}}>ערוך</button>
+            </div>
+          </div>
         : null}
 
-        {c.notes ? <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 12px",marginBottom:14,fontSize:13,color:"#92400e"}}>{"📝 " + c.notes}</div> : null}
-
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:8}}>{"היסטוריית הזמנות (" + relatedOrders.length + ")"}</div>
-          {relatedOrders.length === 0 ?
-            <div style={{padding:"16px",textAlign:"center",color:"#94a3b8",fontSize:13,background:"#f8fafc",borderRadius:10}}>אין עדיין הזמנות ללקוח זה</div>
-          :
-            relatedOrders.map(function(o){
+        {/* טאב הזמנות */}
+        {activeTab==="orders" ?
+          <div>
+            <button onClick={function(){props.onNewOrder(c);}} style={{width:"100%",marginBottom:12,padding:"10px",background:"linear-gradient(135deg,#6366f1,#4f46e5)",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:13}}>+ הזמנה חדשה ללקוח זה</button>
+            {relatedOrders.length===0 ?
+              <div style={{textAlign:"center",padding:"30px",color:"#94a3b8",fontSize:13}}>אין הזמנות עדיין</div>
+            : relatedOrders.map(function(o){
               var st = getStatus(o.status);
               return (
-                <div key={o.id} onClick={function(){props.onOrderClick(o);}} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                <div key={o.id} onClick={function(){props.onOrderClick(o);}} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"12px 14px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}
                   onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
                   onMouseLeave={function(e){e.currentTarget.style.background="#fff";}}>
                   <div>
                     <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{o.id}</div>
                     <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(o.created)}</div>
                   </div>
-                  <span style={{background:st.color+"15",color:st.color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{st.label}</span>
+                  <span style={{background:st.bg,color:st.color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{st.label}</span>
                 </div>
               );
-            })
-          }
-        </div>
+            })}
+          </div>
+        : null}
 
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
-          <button onClick={function(){setConfirmDelete(true);}} style={{padding:"10px 16px",background:"#fef2f2",color:"#ef4444",border:"1px solid #fecaca",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}>מחק</button>
-          <button onClick={function(){props.onEdit(c);}} style={{padding:"10px 20px",background:"linear-gradient(135deg,#6366f1,#4f46e5)",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:14}}>ערוך</button>
-        </div>
+        {/* טאב הצעות מחיר */}
+        {activeTab==="quotes" ?
+          <div>
+            <button onClick={function(){props.onNewQuote(c);}} style={{width:"100%",marginBottom:12,padding:"10px",background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800,fontSize:13}}>+ הצעת מחיר חדשה ללקוח זה</button>
+            {relatedQuotes.length===0 ?
+              <div style={{textAlign:"center",padding:"30px",color:"#94a3b8",fontSize:13}}>אין הצעות מחיר עדיין</div>
+            : relatedQuotes.map(function(q){
+              var statusColors = {draft:{bg:"#f1f5f9",color:"#64748b"},sent:{bg:"#eff6ff",color:"#1d4ed8"},approved:{bg:"#d1fae5",color:"#059669"},rejected:{bg:"#fef2f2",color:"#ef4444"}};
+              var sc = statusColors[q.status] || statusColors.draft;
+              return (
+                <div key={q.id} onClick={function(){props.onQuoteClick(q);}} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"12px 14px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                  onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
+                  onMouseLeave={function(e){e.currentTarget.style.background="#fff";}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{q.id}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(q.created)}</div>
+                  </div>
+                  <span style={{background:sc.bg,color:sc.color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{q.status==="draft"?"טיוטה":q.status==="sent"?"נשלחה":q.status==="approved"?"אושרה":"נדחתה"}</span>
+                </div>
+              );
+            })}
+          </div>
+        : null}
+
+        {/* טאב קבצים */}
+        {activeTab==="files" ?
+          <div>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf,.doc,.docx" multiple style={{display:"none"}} onChange={handleFileUpload} />
+            <button onClick={function(){fileRef.current.click();}} style={{width:"100%",marginBottom:12,padding:"10px",background:"#f8fafc",border:"2px dashed #cbd5e1",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,color:"#475569"}}>📎 העלה קובץ / תמונה / חשבונית</button>
+            {customerFiles.length===0 ?
+              <div style={{textAlign:"center",padding:"30px",color:"#94a3b8",fontSize:13}}>אין קבצים עדיין</div>
+            : customerFiles.map(function(f){
+              var isPDF = f.type && f.type.indexOf("pdf") >= 0;
+              var isImg = f.type && f.type.indexOf("image") >= 0;
+              return (
+                <div key={f.id} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:20}}>{isPDF?"📄":isImg?"🖼️":"📎"}</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{f.name}</div>
+                      <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(f.created)}</div>
+                    </div>
+                  </div>
+                  <button onClick={function(){setViewingFile(f);}} style={{padding:"5px 12px",background:"#1d4ed8",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12}}>פתח</button>
+                </div>
+              );
+            })}
+          </div>
+        : null}
+
       </div>
 
       {confirmDelete ?
@@ -1256,17 +1348,19 @@ function CustomerDetail(props) {
           <div style={{padding:28,textAlign:"center"}}>
             <div style={{fontSize:40,marginBottom:16}}>🗑️</div>
             <h2 style={{margin:"0 0 10px",fontSize:18,fontWeight:800,color:"#0f172a"}}>למחוק את הלקוח?</h2>
-            <p style={{margin:"0 0 24px",fontSize:13,color:"#64748b"}}>{"\"" + c.name + "\" יימחק לצמיתות. ההזמנות הקשורות לא יימחקו."}</p>
+            <p style={{margin:"0 0 24px",fontSize:13,color:"#64748b"}}>{"\""+c.name+"\" יימחק לצמיתות."}</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={function(){setConfirmDelete(false);}} style={{padding:"11px 24px",background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700}}>ביטול</button>
-              <button onClick={function(){ setConfirmDelete(false); props.onDelete(c.id); }} style={{padding:"11px 24px",background:"#ef4444",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800}}>מחק</button>
+              <button onClick={function(){setConfirmDelete(false);props.onDelete(c.id);}} style={{padding:"11px 24px",background:"#ef4444",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800}}>מחק</button>
             </div>
           </div>
         </Modal>
       : null}
+      {viewingFile ? <PDFViewer src={viewingFile.data} name={viewingFile.name} onClose={function(){setViewingFile(null);}} /> : null}
     </Modal>
   );
 }
+
 
 function SignaturePad(props) {
   var canvasRef = useRef();
@@ -1465,7 +1559,7 @@ function ItemSketch(props) {
                   <marker id="arrTop" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
                     <path d="M0,0 L6,3 L0,6 Z" fill="#f97316" />
                   </marker>
-                  <marker id="arrBot" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="270">
+                  <marker id="arrBot" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
                     <path d="M0,0 L6,3 L0,6 Z" fill="#10b981" />
                   </marker>
                 </defs>
@@ -1897,7 +1991,7 @@ var REPORT_TYPES = {
 
 function InstallationReportForm(props) {
   var order = props.order;
-  var [form, setForm] = useState({
+  var [form, setForm] = useState(props.initialReport || {
     id: makeId("RPT"),
     orderId: order.id,
     type: "continuation",
@@ -1993,6 +2087,27 @@ function InstallationReportForm(props) {
         <div style={{marginBottom:18}}>
           <label style={{fontSize:13,fontWeight:800,color:"#0f172a",display:"block",marginBottom:8}}>מה נשאר להשלים / חוסרים</label>
           <DefectsList items={form.defects} onChange={function(items){set("defects",items);}} />
+
+          <div style={{marginTop:16}}>
+            <label style={{fontSize:13,fontWeight:800,color:"#0f172a",display:"block",marginBottom:10}}>מה נשאר לעשות</label>
+            {[
+              {key:"todoMagnets",    label:"מגנטים"},
+              {key:"todoDirections", label:"כיוונים"},
+              {key:"todoDishwasher", label:"דלת מדיח"},
+              {key:"todoSocle",      label:"צוקלים"},
+              {key:"todoHandles",    label:"ידיות"},
+            ].map(function(item){
+              return (
+                <div key={item.key} onClick={function(){set(item.key, !form[item.key]);}}
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:form[item.key]?"#fff7ed":"#f8fafc",border:"1.5px solid "+(form[item.key]?"#fdba74":"#e2e8f0"),borderRadius:10,marginBottom:8,cursor:"pointer"}}>
+                  <div style={{width:24,height:24,borderRadius:6,border:"2px solid "+(form[item.key]?"#f97316":"#cbd5e1"),background:form[item.key]?"#f97316":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {form[item.key] ? <span style={{color:"#fff",fontWeight:900,fontSize:14}}>✓</span> : null}
+                  </div>
+                  <span style={{fontSize:15,fontWeight:700,color:form[item.key]?"#c2410c":"#475569"}}>{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       : null}
 
@@ -2112,6 +2227,19 @@ function ReportViewer(props) {
           </div>
         : null}
 
+        {(r.todoMagnets || r.todoDirections || r.todoDishwasher || r.todoSocle || r.todoHandles) ?
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#c2410c",marginBottom:8}}>⏳ מה נשאר לעשות</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {r.todoMagnets ? <span style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:20,padding:"5px 14px",fontSize:13,fontWeight:700,color:"#c2410c"}}>מגנטים</span> : null}
+              {r.todoDirections ? <span style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:20,padding:"5px 14px",fontSize:13,fontWeight:700,color:"#c2410c"}}>כיוונים</span> : null}
+              {r.todoDishwasher ? <span style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:20,padding:"5px 14px",fontSize:13,fontWeight:700,color:"#c2410c"}}>דלת מדיח</span> : null}
+              {r.todoSocle ? <span style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:20,padding:"5px 14px",fontSize:13,fontWeight:700,color:"#c2410c"}}>צוקלים</span> : null}
+              {r.todoHandles ? <span style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:20,padding:"5px 14px",fontSize:13,fontWeight:700,color:"#c2410c"}}>ידיות</span> : null}
+            </div>
+          </div>
+        : null}
+
         {(r.photos||[]).length > 0 ?
           <div style={{marginBottom:16}}>
             <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:6}}>{"תמונות (" + r.photos.length + ")"}</div>
@@ -2144,49 +2272,92 @@ function OrderCard(props) {
   var pct = Math.round((idx+1)/STATUSES.length*100);
   var isUrgent = order.urgent === true;
   var isCompleted = order.status === "completed";
-
-  // Check if stuck more than 7 days in same status
   var isStuck = false;
-  if (!isCompleted && order.statusUpdatedAt) {
+  if (!isCompleted && !isUrgent && order.statusUpdatedAt) {
     var daysDiff = Math.floor((new Date() - new Date(order.statusUpdatedAt)) / (1000*60*60*24));
     if (daysDiff >= 7) isStuck = true;
   }
 
-  var borderColor = isUrgent ? "#ef4444" : isStuck ? "#f97316" : "#e2e8f0";
-  var cardBg = isUrgent ? "#fff5f5" : isStuck ? "#fff7ed" : "#fff";
-
   return (
     <div onClick={function(){props.onClick(order);}}
-      style={{background:cardBg,borderRadius:14,padding:"18px 20px",boxShadow:"0 2px 12px rgba(30,41,59,0.07)",cursor:"pointer",border:"2px solid "+borderColor,direction:"rtl"}}
-      onMouseEnter={function(e){e.currentTarget.style.boxShadow="0 6px 24px rgba(30,41,59,0.13)";}}
-      onMouseLeave={function(e){e.currentTarget.style.boxShadow="0 2px 12px rgba(30,41,59,0.07)";}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-        <div>
-          <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
-            <div style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{order.id}</div>
-            {isUrgent ? <span style={{background:"#ef4444",color:"#fff",borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>🔴 דחוף</span> : null}
-            {isStuck && !isUrgent ? <span style={{background:"#f97316",color:"#fff",borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:800}}>⏰ תקוע</span> : null}
+      style={{background:"#fff",borderRadius:16,cursor:"pointer",border:"1px solid "+(isUrgent?"#fecaca":isStuck?"#fed7aa":"#f1f5f9"),overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",transition:"box-shadow 0.15s"}}
+      onMouseEnter={function(e){e.currentTarget.style.boxShadow="0 4px 20px rgba(0,0,0,0.1)";}}
+      onMouseLeave={function(e){e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";}}>
+
+      {/* Color accent bar */}
+      <div style={{height:3,background:isUrgent?"#ef4444":isStuck?"#f97316":s.color}} />
+
+      <div style={{padding:"14px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:11,color:"#94a3b8",fontWeight:600,marginBottom:2}}>{order.id}</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",lineHeight:1.2}}>{order.client}</div>
           </div>
-          <div style={{fontSize:17,fontWeight:800,color:"#0f172a"}}>{order.client}</div>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+            <span style={{background:s.bg,color:s.color,borderRadius:6,padding:"3px 8px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{s.label}</span>
+            {isUrgent ? <span style={{background:"#fef2f2",color:"#ef4444",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:700}}>🔴 דחוף</span> : null}
+            {isStuck ? <span style={{background:"#fff7ed",color:"#f97316",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:700}}>⏰ תקוע</span> : null}
+          </div>
         </div>
-        <StatusBadge statusId={order.status} small={true} />
+
+        {order.address ? <div style={{fontSize:12,color:"#64748b",marginBottom:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{"📍 " + order.address}</div> : null}
+
+        <div style={{background:"#f8fafc",borderRadius:8,height:5,overflow:"hidden",marginBottom:6}}>
+          <div style={{width:pct+"%",height:"100%",background:isUrgent?"#ef4444":isStuck?"#f97316":s.color,borderRadius:8,transition:"width 0.3s"}} />
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+          <span>{(order.files||[]).length + " קבצים · " + (order.installationReports||[]).length + " דוחות"}</span>
+          <span style={{fontWeight:700,color:s.color}}>{pct + "%"}</span>
+        </div>
       </div>
-      <div style={{fontSize:13,color:"#64748b",marginBottom:4}}>{"📍 " + order.address}</div>
-      <div style={{fontSize:13,color:"#64748b",marginBottom:12}}>{"📞 " + order.phone}</div>
-      <div style={{background:"#f1f5f9",borderRadius:99,height:5,overflow:"hidden"}}>
-        <div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+s.color+"88,"+s.color+")",borderRadius:99}} />
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:"#94a3b8"}}>
-        <span>{pct}% הושלם</span>
-        <span>{(order.files||[]).length + " קבצים · " + (order.installationReports||[]).length + " דוחות"}</span>
-      </div>
+    </div>
+  );
+}
+
+function CustomerSearchPicker(props) {
+  var customers = props.customers || [];
+  var [query, setQuery] = useState("");
+  var [open, setOpen] = useState(false);
+
+  var filtered = query.trim()
+    ? customers.filter(function(c){
+        var q = query.trim().toLowerCase();
+        return c.name.toLowerCase().indexOf(q) >= 0 || (c.phone||"").indexOf(q) >= 0;
+      })
+    : customers;
+
+  return (
+    <div style={{position:"relative"}}>
+      <input
+        value={query}
+        onChange={function(e){setQuery(e.target.value);setOpen(true);}}
+        onFocus={function(){setOpen(true);}}
+        onBlur={function(){setTimeout(function(){setOpen(false);},150);}}
+        style={Object.assign({},inpStyle,{background:"#eff6ff",border:"1.5px solid #93c5fd"})}
+        placeholder="🔍 חפש לקוח קיים (שם / טלפון)..."
+      />
+      {open && filtered.length > 0 ?
+        <div style={{position:"absolute",top:"100%",right:0,left:0,background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",zIndex:1000,maxHeight:200,overflowY:"auto",direction:"rtl"}}>
+          {filtered.slice(0,8).map(function(c){
+            return (
+              <div key={c.id} onMouseDown={function(){props.onSelect(c);setQuery("");setOpen(false);}}
+                style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f1f5f9"}}
+                onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
+                onMouseLeave={function(e){e.currentTarget.style.background="#fff";}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#0f172a"}}>{c.name}</div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{c.phone}{c.address ? " · " + c.address : ""}</div>
+              </div>
+            );
+          })}
+        </div>
+      : null}
     </div>
   );
 }
 
 function OrderForm(props) {
   var initial = props.initial;
-  var [form, setForm] = useState(initial || {id:makeId("ORD"),client:"",address:"",phone:"",status:"plans",files:[],reports:[],materials:[],assignedInstallers:[],hasPaint:null,missingItems:[],notes:"",created:toISO(new Date())});
+  var [form, setForm] = useState(initial || {id:makeId("ORD"),client:"",address:"",phone:"",status:"plans",files:[],reports:[],materials:[],assignedInstallers:[],hasPaint:null,missingItems:[],totalAmount:"",payments:[],notes:"",created:toISO(new Date())});
   var [errors, setErrors] = useState({});
   var fileRef = useRef();
   var repRef = useRef();
@@ -2458,6 +2629,53 @@ function OrderForm(props) {
         : null}
       </div>
 
+      <div style={{marginBottom:18}}>
+        <label style={{fontSize:12,fontWeight:700,color:"#475569",display:"block",marginBottom:8}}>מעקב תשלומים</label>
+        <div style={{marginBottom:10}}>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>סכום הזמנה כולל</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <input type="number" min="0" value={form.totalAmount||""} onChange={function(e){set("totalAmount",e.target.value);}} style={Object.assign({},inpStyle,{padding:"8px 12px",fontSize:15,fontWeight:700})} placeholder="0" />
+            <span style={{color:"#64748b",fontWeight:700}}>₪</span>
+          </div>
+        </div>
+        {(form.payments||[]).map(function(p,i){
+          return (
+            <div key={p.id} style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px",marginBottom:8}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,alignItems:"center",marginBottom:6}}>
+                <input value={p.label} onChange={function(e){
+                  set("payments",(form.payments||[]).map(function(x,j){ return j===i?Object.assign({},x,{label:e.target.value}):x; }));
+                }} style={Object.assign({},inpStyle,{padding:"7px 10px",fontSize:13})} placeholder="תיאור (מקדמה, יתרה...)" />
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  <input type="number" min="0" value={p.amount} onChange={function(e){
+                    set("payments",(form.payments||[]).map(function(x,j){ return j===i?Object.assign({},x,{amount:e.target.value}):x; }));
+                  }} style={Object.assign({},inpStyle,{padding:"7px 8px",textAlign:"center",fontSize:13})} placeholder="סכום" />
+                  <span style={{color:"#64748b",fontSize:12}}>₪</span>
+                </div>
+                <button onClick={function(){set("payments",(form.payments||[]).filter(function(_,j){return j!==i;}));}} style={{background:"#fef2f2",border:"none",color:"#ef4444",cursor:"pointer",borderRadius:8,padding:"7px 10px",fontWeight:700}}>הסר</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>תאריך תשלום</div>
+                  <input type="date" value={p.date||""} onChange={function(e){
+                    set("payments",(form.payments||[]).map(function(x,j){ return j===i?Object.assign({},x,{date:e.target.value}):x; }));
+                  }} style={Object.assign({},inpStyle,{padding:"6px 8px",fontSize:12})} />
+                </div>
+                <div style={{display:"flex",alignItems:"flex-end",paddingBottom:2}}>
+                  <button onClick={function(){
+                    set("payments",(form.payments||[]).map(function(x,j){ return j===i?Object.assign({},x,{paid:!x.paid}):x; }));
+                  }} style={{width:"100%",padding:"7px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,border:p.paid?"2px solid #059669":"2px solid #e2e8f0",background:p.paid?"#d1fae5":"#fff",color:p.paid?"#059669":"#64748b"}}>
+                    {p.paid ? "✓ התקבל" : "לא התקבל"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <button onClick={function(){
+          set("payments",(form.payments||[]).concat([{id:makeId("PAY"),label:"",amount:"",date:"",paid:false}]));
+        }} style={{width:"100%",padding:"9px",background:"#f0fdf4",border:"1.5px dashed #86efac",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13,color:"#166534"}}>+ הוסף תשלום</button>
+      </div>
+
       <div style={{marginBottom:24}}>
         <label style={{fontSize:12,fontWeight:700,color:"#475569",display:"block",marginBottom:5}}>הערות</label>
         <textarea value={form.notes} onChange={function(e){set("notes",e.target.value);}} rows={2} style={Object.assign({},inpStyle,{resize:"vertical"})} placeholder="הערות נוספות..." />
@@ -2484,6 +2702,8 @@ function OrderDetail(props) {
   var idx = STATUSES.findIndex(function(x){ return x.id===order.status; });
   var pct = Math.round((idx+1)/STATUSES.length*100);
   var [confirmDelete, setConfirmDelete] = useState(false);
+  var [confirmDeleteReport, setConfirmDeleteReport] = useState(null);
+  var [editingReport, setEditingReport] = useState(null);
   var [viewingFile, setViewingFile] = useState(null);
   var canAddReport = props.canAddReport;
   var installReports = order.installationReports || [];
@@ -2555,6 +2775,45 @@ function OrderDetail(props) {
             {order.missingItems.map(function(item,i){
               return <div key={item.id||i} style={{fontSize:13,color:"#92400e",marginBottom:3}}>{"• " + item.text}</div>;
             })}
+          </div>
+        : null}
+        {(order.totalAmount || (order.payments||[]).length > 0) ?
+          <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontSize:12,fontWeight:700,color:"#166534"}}>💰 מעקב תשלומים</span>
+              {order.totalAmount ?
+                <span style={{fontSize:14,fontWeight:900,color:"#166534"}}>{"סה״כ: ₪" + Number(order.totalAmount).toLocaleString()}</span>
+              : null}
+            </div>
+            {(order.payments||[]).length > 0 ?
+              <div>
+                {(function(){
+                  var paid = (order.payments||[]).filter(function(p){return p.paid;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+                  var total = Number(order.totalAmount||0);
+                  var remaining = total - paid;
+                  return (
+                    <div style={{display:"flex",gap:12,marginBottom:8,flexWrap:"wrap"}}>
+                      <span style={{fontSize:12,color:"#059669",fontWeight:700}}>{"שולם: ₪" + paid.toLocaleString()}</span>
+                      {remaining > 0 ? <span style={{fontSize:12,color:"#dc2626",fontWeight:700}}>{"נשאר: ₪" + remaining.toLocaleString()}</span> : <span style={{fontSize:12,color:"#059669",fontWeight:700}}>✓ שולם במלואו</span>}
+                    </div>
+                  );
+                })()}
+                {(order.payments||[]).map(function(p,i){
+                  return (
+                    <div key={p.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderTop:"1px solid #d1fae5"}}>
+                      <div>
+                        <span style={{fontSize:13,fontWeight:600,color:"#0f172a"}}>{p.label||"תשלום"}</span>
+                        {p.date ? <span style={{fontSize:11,color:"#94a3b8",marginRight:8}}>{fmtDate(p.date)}</span> : null}
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{"₪" + Number(p.amount||0).toLocaleString()}</span>
+                        <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:p.paid?"#d1fae5":"#fef2f2",color:p.paid?"#059669":"#ef4444"}}>{p.paid?"✓ שולם":"ממתין"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            : null}
           </div>
         : null}
         {order.notes ? <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:13,color:"#92400e"}}>{"📝 " + order.notes}</div> : null}
@@ -2637,14 +2896,21 @@ function OrderDetail(props) {
             installReports.map(function(r){
               var t = REPORT_TYPES[r.type] || REPORT_TYPES.continuation;
               return (
-                <div key={r.id} onClick={function(){props.onViewReport(r);}} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}
-                  onMouseEnter={function(e){e.currentTarget.style.background="#f8fafc";}}
-                  onMouseLeave={function(e){e.currentTarget.style.background="#fff";}}>
-                  <div>
+                <div key={r.id} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div onClick={function(){props.onViewReport(r);}} style={{flex:1,cursor:"pointer"}}
+                    onMouseEnter={function(e){e.currentTarget.style.opacity="0.8";}}
+                    onMouseLeave={function(e){e.currentTarget.style.opacity="1";}}>
                     <span style={{background:t.color+"15",color:t.color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{t.label}</span>
                     <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>{fmtDate(r.created) + (r.signature ? " · ✓ נחתם" : "")}</div>
+                    {(r.photos||[]).length > 0 ? <span style={{fontSize:11,color:"#64748b"}}>{"📷 " + r.photos.length}</span> : null}
                   </div>
-                  {(r.photos||[]).length > 0 ? <span style={{fontSize:11,color:"#64748b"}}>{"📷 " + r.photos.length}</span> : null}
+                  <div style={{display:"flex",gap:6,flexShrink:0,marginRight:8}}>
+                    <button onClick={function(e){ e.stopPropagation(); setEditingReport(r); }} style={{background:"#eff6ff",border:"none",color:"#1d4ed8",cursor:"pointer",borderRadius:8,padding:"6px 10px",fontWeight:700,fontSize:12}}>ערוך</button>
+                    <button onClick={function(e){
+                      e.stopPropagation();
+                      setConfirmDeleteReport(r);
+                    }} style={{background:"#fef2f2",border:"none",color:"#ef4444",cursor:"pointer",borderRadius:8,padding:"6px 10px",fontWeight:700,fontSize:12}}>מחק</button>
+                  </div>
                 </div>
               );
             })
@@ -2672,6 +2938,41 @@ function OrderDetail(props) {
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={function(){setConfirmDelete(false);}} style={{padding:"11px 24px",background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700}}>ביטול</button>
               <button onClick={function(){ setConfirmDelete(false); props.onDelete(order.id); }} style={{padding:"11px 24px",background:"#ef4444",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800}}>מחק</button>
+            </div>
+          </div>
+        </Modal>
+      : null}
+      {editingReport ?
+        <Modal onClose={function(){setEditingReport(null);}} wide={true}>
+          <InstallationReportForm
+            order={order}
+            initialReport={editingReport}
+            currentUserName={editingReport.installerName}
+            onSave={function(updated){
+              var newReports = installReports.map(function(r){ return r.id===updated.id ? updated : r; });
+              var updatedOrder = Object.assign({},order,{installationReports:newReports});
+              props.onDeleteReport(updatedOrder);
+              setEditingReport(null);
+            }}
+            onCancel={function(){setEditingReport(null);}}
+          />
+        </Modal>
+      : null}
+      {confirmDeleteReport ?
+        <Modal onClose={function(){setConfirmDeleteReport(null);}}>
+          <div style={{padding:28,textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:16}}>🗑️</div>
+            <h2 style={{margin:"0 0 10px",fontSize:18,fontWeight:800,color:"#0f172a"}}>למחוק את הדוח?</h2>
+            <p style={{margin:"0 0 24px",fontSize:13,color:"#64748b"}}>פעולה זו לא ניתנת לביטול.</p>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button onClick={function(){setConfirmDeleteReport(null);}} style={{padding:"11px 24px",background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700}}>ביטול</button>
+              <button onClick={function(){
+                var updated = Object.assign({},order,{
+                  installationReports: installReports.filter(function(x){ return x.id!==confirmDeleteReport.id; })
+                });
+                props.onDeleteReport(updated);
+                setConfirmDeleteReport(null);
+              }} style={{padding:"11px 24px",background:"#ef4444",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontWeight:800}}>מחק</button>
             </div>
           </div>
         </Modal>
@@ -4031,14 +4332,72 @@ function LoginScreen(props) {
 export default function App() {
   var [currentUser, setCurrentUser] = useState(null);
   var [factoryName, setFactoryName] = useLocalStorage("fac_name", "מפעל הנגרות");
+  var [factoryLogo, setFactoryLogo] = useLocalStorage("fac_logo", null);
   var [editingName, setEditingName] = useState(false);
   var [nameInput, setNameInput] = useState("");
-  var [tab, setTab] = useState("home");
+  var [tab, setTab] = useState(function(){
+    var role = currentUser ? currentUser.role : "viewer";
+    if (role === "admin" || role === "viewer") return "home";
+    if (role === "installer") return "calendar";
+    return "orders";
+  });
   var [orders, setOrders] = useLocalStorage("fac_orders", INIT_ORDERS);
   var [events, setEvents] = useLocalStorage("fac_events", INIT_EVENTS);
   var [users, setUsers] = useLocalStorage("fac_users", INIT_USERS);
   var [priceCatalog, setPriceCatalog] = useLocalStorage("fac_price_catalog", {});
   var [syncStatus, setSyncStatus] = useState("syncing");
+  var lastOrderStatuses = useRef({});
+
+  // Request notification permission on first login
+  useEffect(function(){
+    if (currentUser && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, [currentUser]);
+
+  function sendNotification(title, body, tag) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    try {
+      new Notification(title, {
+        body: body,
+        tag: tag || "factory",
+        icon: "/apple-touch-icon.png",
+        badge: "/icon-192.png",
+        dir: "rtl",
+        lang: "he"
+      });
+    } catch(e) {}
+  }
+
+  function checkForChanges(newOrders) {
+    var prev = lastOrderStatuses.current;
+    var now = {};
+    var notifications = [];
+
+    newOrders.forEach(function(o) {
+      now[o.id] = o.status;
+      // Status changed since last check
+      if (prev[o.id] && prev[o.id] !== o.status) {
+        var st = getStatus(o.status);
+        notifications.push({ title:"שינוי סטטוס: " + o.client, body:st.label, tag:"status-" + o.id });
+      }
+      // Stuck > 7 days
+      if (o.status !== "completed" && o.statusUpdatedAt) {
+        var days = Math.floor((new Date() - new Date(o.statusUpdatedAt)) / (1000*60*60*24));
+        if (days >= 7) {
+          notifications.push({ title:"⏰ הזמנה תקועה", body:o.client + " — " + days + " ימים ללא שינוי", tag:"stuck-" + o.id });
+        }
+      }
+    });
+
+    lastOrderStatuses.current = now;
+
+    // Send one notification at a time (avoid spam)
+    if (notifications.length > 0) {
+      var n = notifications[0];
+      sendNotification(n.title, n.body, n.tag);
+    }
+  }
 
   // Auto-refresh from Supabase every 30 seconds
   useEffect(function(){
@@ -4054,6 +4413,7 @@ export default function App() {
             sbLoadArray("fac_customers"),
             sbLoadCatalog()
           ]);
+          checkForChanges(newOrders);
           setOrders(function(){ return newOrders; });
           setEvents(function(){ return newEvents; });
           setPurchaseOrders(function(){ return newPO; });
@@ -4066,7 +4426,6 @@ export default function App() {
         }
       })();
     }, 30000);
-    // Initial status check
     setTimeout(function(){ setSyncStatus("ok"); }, 3000);
     return function(){ clearInterval(interval); };
   }, []);
@@ -4308,6 +4667,27 @@ export default function App() {
 
   function saveOrder(o){
     setOrders(function(prev){ var i=prev.findIndex(function(x){return x.id===o.id;}); return i>=0?prev.map(function(x){return x.id===o.id?o:x;}):[o].concat(prev); });
+    // אם הזמנה חדשה — בדוק אם הלקוח קיים במאגר, אם לא — צור אותו אוטומטית
+    if (!o.customerId) {
+      setCustomers(function(prev){
+        var exists = prev.some(function(c){ return c.name === o.client || c.id === o.customerId; });
+        if (exists) return prev;
+        var newCustomer = {
+          id: makeId("CUST"),
+          name: o.client,
+          phone: o.phone || "",
+          address: o.address || "",
+          source: "",
+          sourceNote: "",
+          notes: "",
+          customerFiles: [],
+          created: toISO(new Date())
+        };
+        // עדכן את ההזמנה עם customerId
+        setOrders(function(orders){ return orders.map(function(x){ return x.id===o.id ? Object.assign({},x,{customerId:newCustomer.id}) : x; }); });
+        return [newCustomer].concat(prev);
+      });
+    }
     setShowNew(false); setEditing(null); setSelected(o);
   }
   function deleteOrder(id){ setOrders(function(prev){return prev.filter(function(o){return o.id!==id;});}); setSelected(null); }
@@ -4325,57 +4705,100 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"'Segoe UI',Arial,sans-serif",direction:"rtl"}}>
-      <div style={{background:"linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#4338ca 100%)",padding:"24px 28px 0",color:"#fff"}}>
+      <div style={{background:"#0f172a",padding:"16px 20px 0",color:"#fff"}}>
         <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-            <div>
-              <div style={{fontSize:11,letterSpacing:2,color:"#a5b4fc",fontWeight:700}}>מערכת ניהול</div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
+
+          {/* Top bar */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{position:"relative",flexShrink:0}}>
+                {factoryLogo ?
+                  <img src={factoryLogo} style={{width:40,height:40,borderRadius:10,objectFit:"cover",border:"1.5px solid rgba(255,255,255,0.15)"}} />
+                :
+                  <div style={{width:40,height:40,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🪵</div>
+                }
+                {isAdmin ?
+                  <div>
+                    <input id="logo-upload-input" type="file" accept="image/*" style={{display:"none"}} onChange={function(e){
+                      var file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      var reader = new FileReader();
+                      reader.onload = function(ev){
+                        var img = new Image();
+                        img.onload = function(){
+                          var canvas = document.createElement("canvas");
+                          var size = 200;
+                          canvas.width = size; canvas.height = size;
+                          var ctx = canvas.getContext("2d");
+                          var scale = size / Math.min(img.width, img.height);
+                          var x = (size - img.width*scale)/2;
+                          var y = (size - img.height*scale)/2;
+                          ctx.drawImage(img, x, y, img.width*scale, img.height*scale);
+                          setFactoryLogo(canvas.toDataURL("image/png"));
+                        };
+                        img.src = ev.target.result;
+                      };
+                      reader.readAsDataURL(file);
+                      e.target.value = "";
+                    }} />
+                    <button onClick={function(){document.getElementById("logo-upload-input").click();}} style={{position:"absolute",bottom:-4,left:-4,width:18,height:18,background:"#6366f1",border:"none",borderRadius:"50%",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",padding:0}} title="החלף לוגו">✏️</button>
+                  </div>
+                : null}
+              </div>
+              <div>
                 {editingName ?
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <input value={nameInput} onChange={function(e){setNameInput(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"){setFactoryName(nameInput||factoryName);setEditingName(false);}if(e.key==="Escape")setEditingName(false);}} autoFocus={true} style={{fontSize:22,fontWeight:900,background:"rgba(255,255,255,0.15)",border:"2px solid rgba(255,255,255,0.5)",borderRadius:8,color:"#fff",padding:"4px 10px",outline:"none",fontFamily:"inherit",direction:"rtl",width:220}} />
-                    <button onClick={function(){setFactoryName(nameInput||factoryName);setEditingName(false);}} style={{background:"#fff",color:"#4338ca",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontWeight:800,fontSize:13}}>שמור</button>
-                    <button onClick={function(){setEditingName(false);}} style={{background:"rgba(255,255,255,0.15)",color:"#fff",border:"none",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13}}>ביטול</button>
+                    <input value={nameInput} onChange={function(e){setNameInput(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"){setFactoryName(nameInput||factoryName);setEditingName(false);}if(e.key==="Escape")setEditingName(false);}} autoFocus={true} style={{fontSize:16,fontWeight:800,background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:8,color:"#fff",padding:"4px 10px",outline:"none",fontFamily:"inherit",direction:"rtl",width:180}} />
+                    <button onClick={function(){setFactoryName(nameInput||factoryName);setEditingName(false);}} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontWeight:700,fontSize:12}}>שמור</button>
                   </div>
                 :
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <h1 style={{margin:"2px 0 0",fontSize:26,fontWeight:900}}>{"🪵 " + factoryName}</h1>
-                    {isAdmin ? <button onClick={function(){setNameInput(factoryName);setEditingName(true);}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:14,color:"rgba(255,255,255,0.7)",marginTop:4}}>✏️</button> : null}
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{fontSize:17,fontWeight:900,color:"#fff",letterSpacing:-0.5}}>{factoryName}</div>
+                    {isAdmin ? <button onClick={function(){setNameInput(factoryName);setEditingName(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"rgba(255,255,255,0.4)",padding:"2px 4px"}}>✏️</button> : null}
                   </div>
                 }
+                <div style={{fontSize:10,color:"#64748b",fontWeight:600,letterSpacing:1}}>מערכת ניהול</div>
               </div>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"8px 14px"}}>
-                <div style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,"+currentRole.color+"88,"+currentRole.color+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff"}}>{currentUser.name[0]}</div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{currentUser.name}</div>
-                  <div style={{fontSize:10,color:"#c7d2fe"}}>{currentRole.label}</div>
-                </div>
+
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {syncStatus === "syncing" ? <span style={{fontSize:10,color:"#64748b"}}>🔄</span> : syncStatus === "offline" ? <span style={{fontSize:10,color:"#ef4444"}}>⚠️</span> : <span style={{fontSize:10,color:"#22c55e"}}>●</span>}
+              <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.07)",borderRadius:8,padding:"6px 10px"}}>
+                <div style={{width:26,height:26,borderRadius:"50%",background:"linear-gradient(135deg,#6366f1,#8b5cf6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:"#fff",flexShrink:0}}>{currentUser.name[0]}</div>
+                <div style={{fontSize:12,fontWeight:700,color:"#e2e8f0"}}>{currentUser.name}</div>
               </div>
               {(tab === "orders" || tab === "calendar" || tab === "po" || tab === "quotes" || tab === "customers" || tab === "designers") && currentUser.role !== "installer" && currentUser.role !== "viewer" ?
-                <button onClick={function(){if(tab==="orders")setShowNew(true);else if(tab==="calendar")setNewEventDate(toISO(new Date()));else if(tab==="po")setShowNewPO(true);else if(tab==="quotes")setShowNewQuote(true);else if(tab==="designers")setTab("designers");else setShowNewCustomer(true);}} style={{background:"#fff",color:"#4338ca",border:"none",borderRadius:12,padding:"11px 22px",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 16px rgba(0,0,0,0.2)"}}>
-                  {tab === "orders" ? "+ הזמנה חדשה" : tab === "calendar" ? "+ אירוע ביומן" : tab === "po" ? "+ הזמנת טובין" : tab === "quotes" ? "+ הצעת מחיר" : tab === "designers" ? "+ מעצב/ת" : "+ לקוח חדש"}
+                <button onClick={function(){if(tab==="orders")setShowNew(true);else if(tab==="calendar")setNewEventDate(toISO(new Date()));else if(tab==="po")setShowNewPO(true);else if(tab==="quotes")setShowNewQuote(true);else if(tab==="designers")setTab("designers");else setShowNewCustomer(true);}} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                  {tab === "orders" ? "+ הזמנה" : tab === "calendar" ? "+ אירוע" : tab === "po" ? "+ הזמנת טובין" : tab === "quotes" ? "+ הצעה" : tab === "designers" ? "+ מעצב/ת" : "+ לקוח"}
                 </button>
               : null}
-              {syncStatus === "syncing" ? <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>🔄 מסנכרן...</span> : syncStatus === "offline" ? <span style={{fontSize:11,color:"#fca5a5"}}>⚠️ לא מחובר</span> : <span style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>✓ מסונכרן</span>}
-              <button onClick={function(){setCurrentUser(null);}} style={{background:"rgba(255,255,255,0.12)",color:"#fff",border:"1.5px solid rgba(255,255,255,0.2)",borderRadius:10,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer"}}>יציאה</button>
+              <button onClick={function(){setCurrentUser(null);}} style={{background:"rgba(255,255,255,0.07)",color:"#94a3b8",border:"none",borderRadius:8,padding:"8px 10px",fontWeight:600,fontSize:12,cursor:"pointer"}}>יציאה</button>
             </div>
           </div>
-          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+
+          {/* Stats chips */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
             {statChips.map(function(chip){
               var isActive = (chip.filter==="all"&&filterStatus==="all"&&tab==="orders")||(chip.filter&&chip.filter!=="__prod__"&&filterStatus===chip.filter&&tab==="orders")||(chip.filter==="__prod__"&&filterStatus==="__prod__"&&tab==="orders")||(chip.filter===null&&tab==="calendar");
               return (
-                <button key={chip.label} onClick={function(){if(chip.filter===null){setTab("calendar");}else{setTab("orders");setFilterStatus(chip.filter);}}} style={{background:isActive?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.1)",border:isActive?"2px solid rgba(255,255,255,0.5)":"2px solid transparent",borderRadius:10,padding:"10px 18px",cursor:"pointer",textAlign:"right"}}>
-                  <div style={{fontSize:20,fontWeight:900,color:"#fff"}}>{chip.val}</div>
-                  <div style={{fontSize:11,color:isActive?"#fff":"#c7d2fe",marginTop:2}}>{chip.label}</div>
+                <button key={chip.label} onClick={function(){if(chip.filter===null){setTab("calendar");}else{setTab("orders");setFilterStatus(chip.filter);}}} style={{background:isActive?"rgba(99,102,241,0.3)":"rgba(255,255,255,0.05)",border:isActive?"1.5px solid #6366f1":"1.5px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 14px",cursor:"pointer",textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end"}}>
+                  <div style={{fontSize:18,fontWeight:900,color:isActive?"#a5b4fc":"#e2e8f0",lineHeight:1}}>{chip.val}</div>
+                  <div style={{fontSize:10,color:isActive?"#a5b4fc":"#64748b",marginTop:2,fontWeight:600}}>{chip.label}</div>
                 </button>
               );
             })}
           </div>
-          <div style={{display:"flex",gap:0,overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+
+          {/* Tabs */}
+          <div style={{display:"flex",gap:0,overflowX:"auto",WebkitOverflowScrolling:"touch",marginBottom:0}}>
             {TABS.map(function(t){
-              return <button key={t.id} onClick={function(){setTab(t.id);}} style={{padding:"12px 20px",border:"none",cursor:"pointer",fontWeight:700,fontSize:13,background:tab===t.id?"#fff":"transparent",color:tab===t.id?"#4338ca":"rgba(255,255,255,0.7)",borderRadius:tab===t.id?"10px 10px 0 0":"0",marginLeft:4,whiteSpace:"nowrap",flexShrink:0}}>{t.label}</button>;
+              var active = tab === t.id;
+              return (
+                <button key={t.id} onClick={function(){setTab(t.id);}}
+                  style={{padding:"10px 16px",border:"none",cursor:"pointer",fontWeight:active?700:500,fontSize:13,background:"transparent",color:active?"#fff":"#64748b",borderBottom:active?"2px solid #6366f1":"2px solid transparent",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"}}>
+                  {t.label}
+                </button>
+              );
             })}
           </div>
         </div>
@@ -4531,12 +4954,12 @@ export default function App() {
       {tab === "admin" ? <AdminDashboard users={users} onUpdateUsers={setUsers} /> : null}
 
       {selected && !editing ?
-        <OrderDetail order={selected} onClose={function(){setSelected(null);}} onEdit={function(o){setEditing(o);}} onDelete={deleteOrder} onStatusChange={statusChange} factoryName={factoryName} onPrintMaterials={function(o){setPrintingOrder(o);}} canAddReport={(currentRole.permissions||[]).indexOf("add_report")>=0} onAddReport={function(o){setAddingReportTo(o);}} onViewReport={function(r){setViewingReport(r);}} users={users} onToggleUrgent={function(updated){ setOrders(function(prev){ return prev.map(function(o){ return o.id===updated.id?updated:o; }); }); setSelected(updated); }} />
+        <OrderDetail order={selected} onClose={function(){setSelected(null);}} onEdit={function(o){setEditing(o);}} onDelete={deleteOrder} onStatusChange={statusChange} factoryName={factoryName} onPrintMaterials={function(o){setPrintingOrder(o);}} canAddReport={(currentRole.permissions||[]).indexOf("add_report")>=0} onAddReport={function(o){setAddingReportTo(o);}} onViewReport={function(r){setViewingReport(r);}} users={users} onToggleUrgent={function(updated){ setOrders(function(prev){ return prev.map(function(o){ return o.id===updated.id?updated:o; }); }); setSelected(updated); }} onDeleteReport={function(updated){ setOrders(function(prev){ return prev.map(function(o){ return o.id===updated.id?updated:o; }); }); setSelected(updated); }} />
       : null}
 
       {showNew || editing ?
         <Modal onClose={function(){setShowNew(false);setEditing(null);}}>
-          <OrderForm initial={editing} onSave={saveOrder} onCancel={function(){setShowNew(false);setEditing(null);}} priceCatalog={priceCatalog} onPriceUpdate={updateCatalogPrice} users={users} />
+          <OrderForm initial={editing} onSave={saveOrder} onCancel={function(){setShowNew(false);setEditing(null);}} priceCatalog={priceCatalog} onPriceUpdate={updateCatalogPrice} users={users} customers={customers} />
         </Modal>
       : null}
 
@@ -4582,11 +5005,16 @@ export default function App() {
       {selectedCustomer && !editingCustomer ?
         <CustomerDetail
           customer={selectedCustomer}
-          relatedOrders={orders.filter(function(o){ return o.client === selectedCustomer.name; })}
+          relatedOrders={orders.filter(function(o){ return o.customerId === selectedCustomer.id || o.client === selectedCustomer.name; })}
+          relatedQuotes={quotes.filter(function(q){ return q.client === selectedCustomer.name; })}
           onClose={function(){setSelectedCustomer(null);}}
-          onEdit={function(c){setEditingCustomer(c);}}
+          onEdit={function(c){setEditingCustomer(c);setShowNewCustomer(true);}}
           onDelete={deleteCustomer}
           onOrderClick={function(o){ setSelectedCustomer(null); setSelected(o); setTab("orders"); }}
+          onQuoteClick={function(q){ setSelectedCustomer(null); setTab("quotes"); }}
+          onNewOrder={function(c){ setSelectedCustomer(null); setEditing({id:makeId("ORD"),client:c.name,phone:c.phone,address:c.address,customerId:c.id,status:"plans",files:[],reports:[],materials:[],assignedInstallers:[],hasPaint:null,missingItems:[],notes:"",created:toISO(new Date())}); setShowNew(true); setTab("orders"); }}
+          onNewQuote={function(c){ setSelectedCustomer(null); setTab("quotes"); setShowNewQuote(true); }}
+          onUpdateFiles={function(files){ setCustomers(function(prev){ return prev.map(function(cu){ return cu.id===selectedCustomer.id ? Object.assign({},cu,{customerFiles:files}) : cu; }); }); }}
         />
       : null}
 
@@ -4594,7 +5022,7 @@ export default function App() {
 
       {addingReportTo ?
         <Modal onClose={function(){setAddingReportTo(null);}} wide={true}>
-          <InstallationReportForm order={addingReportTo} currentUserName={currentUser.name} onSave={saveInstallationReport} onCancel={function(){setAddingReportTo(null);}} />
+          <InstallationReportForm order={addingReportTo} currentUserName={currentUser.name.split(" ")[0]} onSave={saveInstallationReport} onCancel={function(){setAddingReportTo(null);}} />
         </Modal>
       : null}
 
